@@ -1,0 +1,18 @@
+/* globals.css */
+
+/**
+ * @description
+ * Global CSS file that imports Tailwind CSS base, components, and utilities.
+ * This file applies the foundational styles to the entire application.
+ *
+ * @notes
+ * - You can add additional global styles here.
+ * - Make sure to import this file in _app.tsx so that it's applied globally.
+ */
+
+ @tailwind base;
+ @tailwind components;
+ @tailwind utilities;
+ 
+ /* Custom global styles can be added here */
+ 
