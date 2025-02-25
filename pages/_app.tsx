@@ -10,7 +10,7 @@
  * - This file ensures that global CSS is applied across all pages.
  * - Modify this file to add global providers if necessary (e.g., context, state management).
  */
-
+import React from 'react';
 import '../styles/globals.css'
 import type { AppProps } from 'next/app'
 
