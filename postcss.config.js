@@ -1,22 +1,20 @@
 /**
  * @file postcss.config.js
- * @description Configurazione di PostCSS per integrare Tailwind CSS e Autoprefixer.
- * 
- * Questo file è essenziale per garantire che le direttive di Tailwind (come @tailwind base, components e utilities)
- * vengano processate correttamente durante la compilazione del CSS.
- * 
+ * @description
+ * Configurazione aggiornata di PostCSS per integrare @tailwindcss/postcss e Autoprefixer.
+ * Ora utilizziamo @tailwindcss/postcss come plugin per Tailwind CSS.
+ *
  * @dependencies
- * - tailwindcss: Plugin per Tailwind CSS.
- * - autoprefixer: Plugin per aggiungere automaticamente prefissi CSS per la compatibilità cross-browser.
- * 
+ * - @tailwindcss/postcss: Plugin per utilizzare Tailwind CSS con PostCSS.
+ * - autoprefixer: Plugin per aggiungere automaticamente prefissi CSS.
+ *
  * @notes
- * - Assicurati di aver installato tailwindcss, autoprefixer e postcss come dipendenze nel tuo progetto.
+ * - Assicurati di aver installato @tailwindcss/postcss come dipendenza di sviluppo.
  */
 
 module.exports = {
-    plugins: {
-      tailwindcss: {},
+  plugins: {
+      '@tailwindcss/postcss': {},
       autoprefixer: {},
-    },
-  };
-  
+  },
+};
