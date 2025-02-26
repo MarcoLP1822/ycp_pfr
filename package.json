@@ -29,6 +29,7 @@
         "react-dropzone": "^14.3.8"
     },
     "devDependencies": {
+        "@tailwindcss/postcss": "^4.0.9",
         "@types/bcrypt": "^5.0.2",
         "@types/formidable": "^3.4.5",
         "@types/jest": "^29.5.14",

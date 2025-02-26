@@ -24,7 +24,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/router';
-import supabaseClient from '../services/supabaseclient';
+import supabaseClient from '../services/supabaseClient';
 
 const IndexPage: React.FC = () => {
   // State variables for form fields and mode toggle
