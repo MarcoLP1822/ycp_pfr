@@ -1,118 +1,90 @@
 /**
- * @file pages/login.tsx
+ * @file pages/api/auth/login.tsx
  * @description
- * Pagina di login personalizzata utilizzando "username" e "password".
- * Chiama l'API Route /api/auth/login per autenticare l'utente.
+ * Login API endpoint that authenticates the user, generates a JWT,
+ * and sets it as an HTTP-only cookie for secure authentication.
+ *
+ * This endpoint expects a POST request with a JSON body containing
+ * the fields "username" and "password". On successful authentication,
+ * a JWT token is generated and returned to the client via a secure cookie.
+ *
+ * Key Features:
+ * - Validates HTTP method to accept only POST requests.
+ * - Verifies user credentials using a helper function (verifyUserCredentials).
+ * - Generates a JWT token with an expiration time of 1 day.
+ * - Sets the token as an HTTP-only, secure cookie with appropriate attributes.
+ *
+ * @dependencies
+ * - next: For API request/response types.
+ * - jsonwebtoken: For JWT token generation.
+ * - A user credential verification function (verifyUserCredentials).
  *
  * @notes
- * - Assicurarsi di aver configurato correttamente le API routes /api/auth/login.ts.
- * - In questo esempio, "username" viene usato come identificatore dell'utente.
+ * - Ensure that the JWT_SECRET environment variable is set in your environment.
+ * - The secure attribute in the cookie ensures that it is sent only over HTTPS.
+ * - Adjust the cookie attributes as needed for your deployment environment.
  */
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/router';
+import type { NextApiRequest, NextApiResponse } from 'next';
+import jwt from 'jsonwebtoken';
 
-const LoginPage: React.FC = () => {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [info, setInfo] = useState('');
-  const router = useRouter();
+/**
+ * Dummy function for verifying user credentials.
+ * Replace this with your actual user authentication logic.
+ *
+ * @param username - The username provided in the login request.
+ * @param password - The password provided in the login request.
+ * @returns A user object if credentials are valid, otherwise null.
+ */
+async function verifyUserCredentials(username: string, password: string) {
+  // For demonstration purposes, we assume that if username and password are "admin", then authentication is successful.
+  if (username === 'admin' && password === 'admin') {
+    return { id: '1', email: 'admin@example.com' };
+  }
+  // In a real-world scenario, fetch user data from your database and verify the password.
+  return null;
+}
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setError('');
-    setInfo('');
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // Allow only POST requests.
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed. Only POST requests are accepted.' });
+  }
 
-    try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
-      });
+  const { username, password } = req.body;
 
-      const data = await response.json();
+  // Validate input.
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Username and password are required.' });
+  }
 
-      if (!response.ok) {
-        setError(data.error || 'Credenziali non valide');
-        return;
-      }
-
-      if (data.token) {
-        localStorage.setItem('token', data.token);
-      }
-
-      setInfo('Login effettuato con successo!');
-      setTimeout(() => {
-        router.push('/dashboard');
-      }, 1500);
-    } catch (err: any) {
-      console.error('Login error:', err);
-      setError('Si è verificato un errore imprevisto.');
+  try {
+    // Verify the user's credentials.
+    const user = await verifyUserCredentials(username, password);
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid credentials. Please check your username and password.' });
     }
-  };
 
-  return (
-    <div className="h-screen flex items-center justify-center bg-gray-100">
-      <div className="w-full max-w-md p-8 bg-white rounded shadow">
-        <h2 className="text-2xl font-bold mb-6 text-center">Login</h2>
-        {error && (
-          <div className="mb-4 text-red-600 text-center">
-            {error}
-          </div>
-        )}
-        {info && (
-          <div className="mb-4 text-green-600 text-center">
-            {info}
-          </div>
-        )}
-        <form onSubmit={handleSubmit}>
-          <div className="mb-4">
-            <label htmlFor="username" className="block text-gray-700 font-medium mb-2">
-              Username
-            </label>
-            <input
-              id="username"
-              type="text"
-              placeholder="Inserisci il tuo username"
-              className="w-full px-3 py-2 border rounded focus:outline-none focus:ring focus:border-blue-300"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              required
-            />
-          </div>
-          <div className="mb-6">
-            <label htmlFor="password" className="block text-gray-700 font-medium mb-2">
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              placeholder="Inserisci la tua password"
-              className="w-full px-3 py-2 border rounded focus:outline-none focus:ring focus:border-blue-300"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </div>
-          <button
-            type="submit"
-            className="w-full py-2 px-4 bg-blue-500 text-white font-semibold rounded hover:bg-blue-600 transition-colors"
-          >
-            Login
-          </button>
-        </form>
-        <div className="mt-4 text-center">
-          <a
-            href="/register"
-            className="text-blue-500 hover:underline"
-          >
-            Non hai un account? Registrati
-          </a>
-        </div>
-      </div>
-    </div>
-  );
-};
+    // Generate a JWT token with a payload containing user information.
+    const payload = { userId: user.id, email: user.email };
+    const token = jwt.sign(payload, process.env.JWT_SECRET as string, { expiresIn: '1d' });
 
-export default LoginPage;
+    // Set the JWT token as an HTTP-only cookie.
+    // Attributes:
+    // - HttpOnly: Cookie is not accessible via client-side JavaScript.
+    // - Secure: Cookie is sent only over HTTPS.
+    // - Path=/ : Cookie is available for all routes.
+    // - Max-Age=86400: Cookie expires in 1 day (86400 seconds).
+    // - SameSite=Strict: Cookie is not sent with cross-site requests.
+    res.setHeader(
+      'Set-Cookie',
+      `token=${token}; HttpOnly; Path=/; Max-Age=86400; Secure; SameSite=Strict`
+    );
+
+    // Respond with a success message.
+    return res.status(200).json({ message: 'Login successful.' });
+  } catch (error: any) {
+    console.error('Error during login:', error);
+    return res.status(500).json({ error: 'Internal server error.' });
+  }
+}
