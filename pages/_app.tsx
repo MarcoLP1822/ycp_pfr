@@ -11,7 +11,7 @@
  * - Modify this file to add global providers if necessary (e.g., context, state management).
  */
 import React from 'react';
-import '../styles/globals.css'
+import '../styles/global.css'
 import type { AppProps } from 'next/app'
 
 function MyApp({ Component, pageProps }: AppProps) {
