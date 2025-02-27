@@ -22,7 +22,7 @@
 
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { createMiddlewareSupabaseClient } from '@supabase/auth-helpers-nextjs';
+import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs';
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -35,7 +35,7 @@ export async function middleware(request: NextRequest) {
 
   // Initialize the Supabase client for the middleware.
   const res = NextResponse.next();
-  const supabase = createMiddlewareSupabaseClient({ req: request, res });
+  const supabase = createMiddlewareClient({ req: request, res });
 
   // Retrieve the user session from Supabase.
   const {
