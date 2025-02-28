@@ -28,11 +28,12 @@
  * - Proper error handling is implemented to ensure that any failure during the process is logged and returned.
  */
 
+// pages/api/proofreading/process.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 import drizzleClient from '../../../services/drizzleClient';
 import { files, proofreadingLogs } from '../../../db/schema';
 import { eq } from 'drizzle-orm';
-import supabaseClient from '../../../services/supabaseClient';
+import { createServerSupabaseClient } from '@supabase/auth-helpers-nextjs';
 import { extractTextFromFile, SupportedFileType } from '../../../services/textExtractor';
 import { proofreadDocument, ProofreadingResult } from '../../../services/openaiService';
 import Logger from '../../../services/logger';
@@ -69,11 +70,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .where(eq(files.file_id, file_id));
     Logger.info(`Proofreading status updated to 'in-progress' for file_id: ${file_id}`);
 
-    // Download the file from Supabase Storage.
+    // Creiamo il client Supabase server-side utilizzando i Supabase Auth Helpers
+    const supabase = createServerSupabaseClient({ req, res });
     const bucketName = 'uploads';
-    const { data: downloadData, error: downloadError } = await supabaseClient.storage
+    const { data: downloadData, error: downloadError } = await supabase.storage
       .from(bucketName)
       .download(fileRecord.file_url);
+
     if (downloadError || !downloadData) {
       Logger.error(`Failed to download file: ${downloadError?.message}`);
       // Update status to pending if download fails.
