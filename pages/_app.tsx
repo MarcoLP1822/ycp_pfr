@@ -1,21 +1,22 @@
-/**
- * @description
- * Custom App component for initializing pages.
- * Imports global styles and wraps each page component.
- *
- * @dependencies
- * - Next.js: Provides the AppProps type and component rendering.
- *
- * @notes
- * - This file ensures that global CSS is applied across all pages.
- * - Modify this file to add global providers if necessary (e.g., context, state management).
- */
-import React from 'react';
-import '../styles/global.css'
+// pages/_app.tsx
 import type { AppProps } from 'next/app'
+import { useState } from 'react'
+import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs'
+import { SessionContextProvider } from '@supabase/auth-helpers-react'
+import { Session } from '@supabase/auth-helpers-react'
 
-function MyApp({ Component, pageProps }: AppProps) {
-  return <Component {...pageProps} />
+export default function MyApp({ Component, pageProps }: AppProps<{
+  initialSession: Session
+}>) {
+  // Crea il client Supabase una sola volta (stato persistente)
+  const [supabaseClient] = useState(() => createBrowserSupabaseClient())
+
+  return (
+    <SessionContextProvider
+      supabaseClient={supabaseClient}
+      initialSession={pageProps.initialSession}
+    >
+      <Component {...pageProps} />
+    </SessionContextProvider>
+  )
 }
-
-export default MyApp

@@ -1,77 +1,53 @@
-/**
- * @file pages/index.tsx
- * @description
- * This file implements the landing page that serves as the login and registration page for the application.
- * Users can enter their email and password to either sign in or register. It integrates with Supabase Auth for
- * user authentication and session management.
- *
- * Key features:
- * - Toggle between "Login" and "Sign Up" modes.
- * - Form validation for email and password.
- * - Displays error messages from Supabase on failed attempts.
- * - Redirects authenticated users to the dashboard.
- *
- * @dependencies
- * - React: For component creation and state management.
- * - Next.js: For routing and page setup.
- * - Supabase Client: For authentication functions.
- * - Next Router: For redirecting users upon successful login/signup.
- *
- * @notes
- * - Ensure that Supabase is properly configured with NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.
- * - Adjust the redirection path as necessary based on your application routing.
- */
+// pages/index.tsx
+import React, { useState } from 'react'
+import { useRouter } from 'next/router'
+import { useSupabaseClient } from '@supabase/auth-helpers-react'
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/router';
-import supabaseClient from '../services/supabaseClient';
+export default function IndexPage() {
+  // Ottieni il client di Supabase dal context
+  const supabase = useSupabaseClient()
+  const router = useRouter()
 
-const IndexPage: React.FC = () => {
-  // State variables for form fields and mode toggle
-  const [email, setEmail] = useState<string>('');
-  const [password, setPassword] = useState<string>('');
-  const [isSignUp, setIsSignUp] = useState<boolean>(false);
-  const [error, setError] = useState<string>('');
-  const router = useRouter();
+  // Stati per form e gestione errori
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [isSignUp, setIsSignUp] = useState(false)
+  const [error, setError] = useState('')
 
-  /**
-   * Handles form submission for both login and registration.
-   * Uses Supabase Auth methods for authentication.
-   */
+  // Gestore submit
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setError('');
-    
+    e.preventDefault()
+    setError('')
+
     try {
       if (isSignUp) {
-        // Registration process
-        const { error: signUpError } = await supabaseClient.auth.signUp({
+        // Registrazione con Supabase
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
-        });
-        if (signUpError) {
-          setError(signUpError.message);
-          return;
+        })
+        if (error) {
+          setError(error.message)
+          return
         }
-        // Optionally, you can show a confirmation message or redirect
-        alert('Registration successful! Please check your email to confirm your account.');
+        alert('Registrazione completata! Controlla la tua email per confermare l’account.')
       } else {
-        // Login process
-        const { error: signInError } = await supabaseClient.auth.signInWithPassword({
+        // Login con Supabase
+        const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
-        });
-        if (signInError) {
-          setError(signInError.message);
-          return;
+        })
+        if (error) {
+          setError(error.message)
+          return
         }
-        // Redirect to the dashboard after successful login
-        router.push('/dashboard');
+        // Se il login va a buon fine, reindirizza alla dashboard
+        router.push('/dashboard')
       }
     } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred.');
+      setError(err.message || 'Si è verificato un errore imprevisto.')
     }
-  };
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
@@ -122,16 +98,14 @@ const IndexPage: React.FC = () => {
           <button
             className="text-blue-500 hover:underline"
             onClick={() => {
-              setIsSignUp(!isSignUp);
-              setError('');
+              setIsSignUp(!isSignUp)
+              setError('')
             }}
           >
-            {isSignUp ? 'Already have an account? Login' : "Don't have an account? Sign Up"}
+            {isSignUp ? 'Hai già un account? Effettua il login' : "Non hai un account? Registrati"}
           </button>
         </div>
       </div>
     </div>
-  );
-};
-
-export default IndexPage;
+  )
+}
