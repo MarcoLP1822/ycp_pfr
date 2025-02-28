@@ -1,67 +1,56 @@
 /**
  * @file pages/proofreading/[fileId].tsx
  * @description
- * This page provides the proofreading interface for a specific file.
- * It captures the fileId from the URL and displays a side-by-side view of the
- * original text and the corrected text with inline highlights.
+ * This file implements the Proofreading Interface page as a proper Next.js dynamic page.
+ * It captures the fileId from the URL and displays a two-column layout showing the original text
+ * and the corrected text with inline highlights. This page replaces the previous API route that was
+ * incorrectly placed in the `api/` folder.
  *
  * Key features:
  * - Dynamic routing using the fileId URL parameter.
- * - Two-column layout for side-by-side comparison of texts.
- * - A "Back to Dashboard" button for easy navigation.
- * - Simulated data fetching for demonstration purposes.
+ * - Side-by-side view for comparing original and corrected text.
+ * - Navigation back to the Dashboard.
  *
  * @dependencies
  * - React: For state management and rendering.
- * - Next.js useRouter: For dynamic routing and accessing the fileId.
- * - Tailwind CSS: For responsive styling.
+ * - Next.js useRouter: To access dynamic route parameters.
+ * - Next.js Link: For navigation between pages.
  *
  * @notes
- * - In a complete implementation, the data would be fetched from a backend API.
- * - Error handling and loading states are included for robustness.
+ * - In a complete implementation, replace the simulated data fetching with an API call (e.g., /api/proofreading/details?fileId=...).
+ * - Ensure that any references to the old API route are updated to point to this new page.
+ * - Proper error handling is implemented for loading and data retrieval failures.
  */
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 
+// Define the interface for proofreading data
 interface ProofreadingData {
   originalText: string;
   correctedText: string;
 }
 
-/**
- * ProofreadingInterfacePage Component
- * This component displays the proofreading interface for a given file.
- */
 const ProofreadingInterfacePage: React.FC = () => {
-  // Access the dynamic fileId from the URL using Next.js router.
+  // Access the dynamic fileId parameter from the URL using Next.js router
   const router = useRouter();
   const { fileId } = router.query;
 
-  // Local state for proofreading data (original and corrected text).
-  const [data, setData] = useState<ProofreadingData>({
-    originalText: '',
-    correctedText: '',
-  });
+  // Local state to hold proofreading data, loading state, and any error messages
+  const [data, setData] = useState<ProofreadingData>({ originalText: '', correctedText: '' });
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>('');
 
-  // Simulate fetching proofreading data for the given fileId.
+  // useEffect hook to simulate data fetching when fileId is available
   useEffect(() => {
-    if (!fileId) return; // Wait until fileId is available.
+    if (!fileId) return; // Wait until fileId is available
     const fetchProofreadingData = async () => {
       try {
-        // In a full implementation, replace the following with an API call, e.g.,
-        // const response = await fetch(`/api/proofreading/details?fileId=${fileId}`);
-        // const result = await response.json();
-        // setData({ originalText: result.originalText, correctedText: result.correctedText });
-        
-        // Simulated data for demonstration purposes:
+        // Simulated data for demonstration purposes. Replace this with an actual API call if needed.
         setData({
           originalText: 'This is the origial text with some erors.',
-          correctedText:
-            'This is the <mark>original</mark> text with some <mark>errors</mark>.',
+          correctedText: 'This is the <mark>original</mark> text with some <mark>errors</mark>.',
         });
         setLoading(false);
       } catch (err: any) {
@@ -73,7 +62,7 @@ const ProofreadingInterfacePage: React.FC = () => {
     fetchProofreadingData();
   }, [fileId]);
 
-  // Render a loading state, error message, or the proofreading interface.
+  // Render loading state
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
@@ -82,6 +71,7 @@ const ProofreadingInterfacePage: React.FC = () => {
     );
   }
 
+  // Render error state if data fetching fails
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
@@ -90,24 +80,25 @@ const ProofreadingInterfacePage: React.FC = () => {
     );
   }
 
+  // Render the proofreading interface with a header, file ID display, and split-view layout
   return (
     <div className="min-h-screen bg-gray-100 p-6">
-      {/* Header with navigation */}
+      {/* Header with page title and navigation back to the Dashboard */}
       <header className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Proofreading Interface</h1>
-        <Link href="/dashboard">
-          <a className="text-blue-500 hover:underline">Back to Dashboard</a>
+        <Link href="/dashboard" className="text-blue-500 hover:underline">
+          Back to Dashboard
         </Link>
       </header>
 
-      {/* Display fileId for reference */}
+      {/* Display the fileId for reference */}
       <div className="mb-4">
         <p className="text-gray-700">File ID: {fileId}</p>
       </div>
 
-      {/* Two-column layout for original and corrected texts */}
+      {/* Split-view layout: original text on the left and corrected text on the right */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Original text field */}
+        {/* Original text column */}
         <div className="bg-white p-4 rounded shadow">
           <h2 className="text-xl font-semibold mb-2">Original Text</h2>
           <textarea
@@ -116,13 +107,11 @@ const ProofreadingInterfacePage: React.FC = () => {
             value={data.originalText}
           />
         </div>
-
-        {/* Corrected text field with inline highlights */}
+        {/* Corrected text column with inline highlights */}
         <div className="bg-white p-4 rounded shadow">
           <h2 className="text-xl font-semibold mb-2">Corrected Text</h2>
           <div
             className="w-full h-64 p-2 border rounded overflow-auto whitespace-pre-wrap"
-            // Rendering HTML from the corrected text.
             dangerouslySetInnerHTML={{ __html: data.correctedText }}
           />
         </div>
