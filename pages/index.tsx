@@ -4,24 +4,23 @@ import { useRouter } from 'next/router'
 import { useSupabaseClient } from '@supabase/auth-helpers-react'
 
 export default function IndexPage() {
-  // Ottieni il client di Supabase dal context
-  const supabase = useSupabaseClient()
   const router = useRouter()
+  // Otteniamo l'istanza di Supabase dal context
+  const supabase = useSupabaseClient()
 
-  // Stati per form e gestione errori
+  // Stati
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isSignUp, setIsSignUp] = useState(false)
   const [error, setError] = useState('')
 
-  // Gestore submit
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setError('')
 
     try {
       if (isSignUp) {
-        // Registrazione con Supabase
+        // Registrazione
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -32,7 +31,7 @@ export default function IndexPage() {
         }
         alert('Registrazione completata! Controlla la tua email per confermare l’account.')
       } else {
-        // Login con Supabase
+        // Login
         const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
@@ -41,7 +40,7 @@ export default function IndexPage() {
           setError(error.message)
           return
         }
-        // Se il login va a buon fine, reindirizza alla dashboard
+        // Se il login ha successo, reindirizza
         router.push('/dashboard')
       }
     } catch (err: any) {

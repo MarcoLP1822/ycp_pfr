@@ -1,15 +1,15 @@
 // pages/_app.tsx
-import type { AppProps } from 'next/app'
 import { useState } from 'react'
-import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs'
+import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs'
 import { SessionContextProvider } from '@supabase/auth-helpers-react'
-import { Session } from '@supabase/auth-helpers-react'
+import type { AppProps } from 'next/app'
+import type { Session } from '@supabase/auth-helpers-react'
 
-export default function MyApp({ Component, pageProps }: AppProps<{
-  initialSession: Session
-}>) {
-  // Crea il client Supabase una sola volta (stato persistente)
-  const [supabaseClient] = useState(() => createBrowserSupabaseClient())
+import '../styles/global.css' // se usi Tailwind e altre global CSS
+
+function MyApp({ Component, pageProps }: AppProps<{ initialSession: Session }>) {
+  // Creiamo il client di Supabase una sola volta
+  const [supabaseClient] = useState(() => createPagesBrowserClient());
 
   return (
     <SessionContextProvider
@@ -20,3 +20,5 @@ export default function MyApp({ Component, pageProps }: AppProps<{
     </SessionContextProvider>
   )
 }
+
+export default MyApp
