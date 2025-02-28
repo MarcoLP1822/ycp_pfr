@@ -7,12 +7,14 @@
  * - DELETE: To delete a file. Expects file_id in the request body.
  * 
  * Now includes logging calls for performance monitoring and debugging.
+ * Additionally, for DELETE requests, it removes the file from the Supabase Storage bucket.
  *
  * @dependencies
  * - Next.js API types for request and response handling.
  * - Drizzle ORM for database operations.
  * - Database schema from db/schema.ts for the 'files' table.
  * - Logger service for logging events.
+ * - Supabase Auth Helpers to create a server-side Supabase client.
  *
  * @notes
  * - Ensure that proper authentication is in place to restrict these actions to authorized users.
@@ -23,6 +25,7 @@ import drizzleClient from '../../../services/drizzleClient';
 import { files } from '../../../db/schema';
 import { eq } from 'drizzle-orm';
 import Logger from '../../../services/logger';
+import { createServerSupabaseClient } from '@supabase/auth-helpers-nextjs';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   Logger.info(`File management endpoint invoked with method ${req.method}.`);
@@ -63,7 +66,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     try {
-      // Delete the file record where file_id matches using Drizzle ORM
+      // Retrieve the file record from the database to obtain the file_url
+      const fileRecords = await drizzleClient.select().from(files).where(eq(files.file_id, file_id));
+      if (!fileRecords || fileRecords.length === 0) {
+        Logger.error(`File not found for file_id: ${file_id}`);
+        return res.status(404).json({ error: 'File not found.' });
+      }
+      const fileRecord = fileRecords[0];
+
+      // Create a server-side Supabase client to interact with storage
+      const supabase = createServerSupabaseClient({ req, res });
+      const bucketName = 'uploads'; // Ensure this is the correct bucket name used for file uploads
+
+      // Delete the file from the bucket using the file_url stored in the record
+      const { error: storageError } = await supabase.storage
+        .from(bucketName)
+        .remove([fileRecord.file_url]);
+
+      if (storageError) {
+        Logger.error(`Failed to delete file from bucket: ${storageError.message}`);
+        return res.status(500).json({ error: `Failed to delete file from bucket: ${storageError.message}` });
+      }
+
+      // Now delete the file record from the database
       const deletedFile = await drizzleClient
         .delete(files)
         .where(eq(files.file_id, file_id))
