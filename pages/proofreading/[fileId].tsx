@@ -1,15 +1,16 @@
 /**
  * @file pages/proofreading/[fileId].tsx
  * @description
- * This file implements the Proofreading Interface page as a proper Next.js dynamic page.
- * It captures the fileId from the URL and displays a two-column layout showing the original text
- * and the corrected text with inline highlights. This page replaces the previous API route that was
- * incorrectly placed in the `api/` folder.
+ * This dynamic page implements the Proofreading Interface using a split view.
+ * It fetches the proofreading details (original text and diff-based corrected text with <mark> tags)
+ * from the `/api/proofreading/details` endpoint based on the fileId provided in the URL.
+ * The page displays the original text on the left and the highlighted corrected text on the right.
  *
  * Key features:
  * - Dynamic routing using the fileId URL parameter.
- * - Side-by-side view for comparing original and corrected text.
- * - Navigation back to the Dashboard.
+ * - Fetches proofreading data from the backend on mount.
+ * - Displays a split view for comparing the original and corrected texts.
+ * - Provides navigation back to the Dashboard.
  *
  * @dependencies
  * - React: For state management and rendering.
@@ -17,44 +18,47 @@
  * - Next.js Link: For navigation between pages.
  *
  * @notes
- * - In a complete implementation, replace the simulated data fetching with an API call (e.g., /api/proofreading/details?fileId=...).
- * - Ensure that any references to the old API route are updated to point to this new page.
- * - Proper error handling is implemented for loading and data retrieval failures.
+ * - Ensure that the `/api/proofreading/details` endpoint returns the diff-based text in the "correctedText" field.
+ * - Handles loading and error states for improved user experience.
  */
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 
-// Define the interface for proofreading data
+// Define the interface for the proofreading data retrieved from the backend.
 interface ProofreadingData {
   originalText: string;
-  correctedText: string;
+  correctedText: string; // Contains <mark> tags for highlighted differences
 }
 
 const ProofreadingInterfacePage: React.FC = () => {
-  // Access the dynamic fileId parameter from the URL using Next.js router
   const router = useRouter();
   const { fileId } = router.query;
 
-  // Local state to hold proofreading data, loading state, and any error messages
-  const [data, setData] = useState<ProofreadingData>({ originalText: '', correctedText: '' });
+  // Local state for proofreading data, loading status, and error messages.
+  const [data, setData] = useState<ProofreadingData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>('');
 
-  // useEffect hook to simulate data fetching when fileId is available
+  /**
+   * useEffect hook to fetch proofreading details once fileId is available.
+   * Calls the /api/proofreading/details endpoint and updates state.
+   */
   useEffect(() => {
-    if (!fileId) return; // Wait until fileId is available
+    if (!fileId) return;
     const fetchProofreadingData = async () => {
       try {
-        // Simulated data for demonstration purposes. Replace this with an actual API call if needed.
-        setData({
-          originalText: 'This is the origial text with some erors.',
-          correctedText: 'This is the <mark>original</mark> text with some <mark>errors</mark>.',
-        });
+        const response = await fetch(`/api/proofreading/details?fileId=${fileId}`);
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to fetch proofreading details.');
+        }
+        const result: ProofreadingData = await response.json();
+        setData(result);
         setLoading(false);
       } catch (err: any) {
-        setError('Failed to load proofreading data.');
+        setError(err.message || 'Error fetching proofreading data.');
         setLoading(false);
       }
     };
@@ -62,7 +66,7 @@ const ProofreadingInterfacePage: React.FC = () => {
     fetchProofreadingData();
   }, [fileId]);
 
-  // Render loading state
+  // Render loading state.
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
@@ -71,7 +75,7 @@ const ProofreadingInterfacePage: React.FC = () => {
     );
   }
 
-  // Render error state if data fetching fails
+  // Render error state.
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
@@ -80,10 +84,10 @@ const ProofreadingInterfacePage: React.FC = () => {
     );
   }
 
-  // Render the proofreading interface with a header, file ID display, and split-view layout
+  // Render the proofreading interface with a split view.
   return (
     <div className="min-h-screen bg-gray-100 p-6">
-      {/* Header with page title and navigation back to the Dashboard */}
+      {/* Header with title and link back to Dashboard */}
       <header className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Proofreading Interface</h1>
         <Link href="/dashboard" className="text-blue-500 hover:underline">
@@ -91,28 +95,29 @@ const ProofreadingInterfacePage: React.FC = () => {
         </Link>
       </header>
 
-      {/* Display the fileId for reference */}
+      {/* File ID display */}
       <div className="mb-4">
         <p className="text-gray-700">File ID: {fileId}</p>
       </div>
 
-      {/* Split-view layout: original text on the left and corrected text on the right */}
+      {/* Split-view layout */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Original text column */}
+        {/* Original text */}
         <div className="bg-white p-4 rounded shadow">
           <h2 className="text-xl font-semibold mb-2">Original Text</h2>
           <textarea
             readOnly
             className="w-full h-64 p-2 border rounded resize-none"
-            value={data.originalText}
+            value={data?.originalText || ''}
           />
         </div>
-        {/* Corrected text column with inline highlights */}
+
+        {/* Corrected text with diff-based highlighting */}
         <div className="bg-white p-4 rounded shadow">
           <h2 className="text-xl font-semibold mb-2">Corrected Text</h2>
           <div
             className="w-full h-64 p-2 border rounded overflow-auto whitespace-pre-wrap"
-            dangerouslySetInnerHTML={{ __html: data.correctedText }}
+            dangerouslySetInnerHTML={{ __html: data?.correctedText || '' }}
           />
         </div>
       </div>

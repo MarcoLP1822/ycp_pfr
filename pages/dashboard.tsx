@@ -11,7 +11,7 @@
  * - Fetches file metadata from the backend on component mount.
  * - Maintains a local state for the file list.
  * - Provides event handlers for renaming, deleting, and proofreading actions.
- * - Uses Next.js router for navigation to the proofreading page.
+ * - Uses Next.js router for navigation to the proofreading interface.
  * 
  * @dependencies
  * - React: For component creation and state management.
@@ -119,12 +119,32 @@ const Dashboard: React.FC = () => {
 
   /**
    * Handle the proofreading action.
-   * Navigates the user to the proofreading page for the selected file.
+   * This function now triggers the proofreading process by calling the `/api/proofreading/process`
+   * endpoint. Once the process is successfully triggered, it navigates the user to the proofreading
+   * detail page.
    *
    * @param fileId - The unique identifier of the file to proofread.
    */
-  const handleProofread = (fileId: string) => {
-    router.push(`/proofreading/${fileId}`);
+  const handleProofread = async (fileId: string) => {
+    try {
+      // Trigger the proofreading process
+      const response = await fetch('/api/proofreading/process', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ file_id: fileId })
+      });
+      if (!response.ok) {
+        console.error('Proofreading process failed:', response.statusText);
+        return;
+      }
+      // Optionally, you can show a loading indicator while proofreading is in progress.
+      // For now, we navigate immediately after triggering the process.
+      router.push(`/proofreading/${fileId}`);
+    } catch (error) {
+      console.error('Error triggering proofreading process:', error);
+    }
   };
 
   return (
