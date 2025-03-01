@@ -3,11 +3,11 @@
  * @description
  * This component represents an individual file item in the file list.
  * It displays file information (such as name, type, and proofreading status) and provides
- * action buttons for renaming, deleting, and initiating the proofreading process.
+ * action buttons for renaming, deleting, initiating the proofreading process, and viewing version history.
  *
  * Key features:
  * - Toggle between display and edit mode for renaming.
- * - Immediate triggers for file deletion and proofreading.
+ * - Immediate triggers for file deletion, proofreading, and version history.
  *
  * @dependencies
  * - React: For component creation and state management.
@@ -26,6 +26,7 @@ interface FileItemProps {
   onRename: (fileId: string, newName: string) => void;
   onDelete: (fileId: string) => void;
   onProofread: (fileId: string) => void;
+  onViewVersions: (fileId: string) => void; // New callback for version history
 }
 
 /**
@@ -34,8 +35,9 @@ interface FileItemProps {
  * @param onRename - Callback function to rename the file.
  * @param onDelete - Callback function to delete the file.
  * @param onProofread - Callback function to initiate proofreading.
+ * @param onViewVersions - Callback function to view version history.
  */
-const FileItem: React.FC<FileItemProps> = ({ file, onRename, onDelete, onProofread }) => {
+const FileItem: React.FC<FileItemProps> = ({ file, onRename, onDelete, onProofread, onViewVersions }) => {
   // Local state to manage whether the file name is in edit mode.
   const [isEditing, setIsEditing] = useState<boolean>(false);
   // Local state to hold the new file name during renaming.
@@ -95,6 +97,13 @@ const FileItem: React.FC<FileItemProps> = ({ file, onRename, onDelete, onProofre
           className="bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600 transition-colors"
         >
           Proofread
+        </button>
+        {/* Button to view version history */}
+        <button
+          onClick={() => onViewVersions(file.file_id)}
+          className="bg-purple-500 text-white px-2 py-1 rounded hover:bg-purple-600 transition-colors"
+        >
+          Version History
         </button>
       </div>
     </div>

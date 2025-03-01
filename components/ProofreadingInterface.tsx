@@ -1,37 +1,42 @@
 /**
  * @file components/ProofreadingInterface.tsx
  * @description
- * This component displays the proofreading interface with a two-column layout.
- * The left column shows the original text, and the right column shows the
- * corrected text with inline corrections highlighted using <mark> tags.
- * It also handles user interactions for accepting individual corrections
- * via clicking on highlighted corrections, and it integrates the CorrectionControls component
- * for bulk acceptance of all corrections.
- *
- * Key features:
- * - Two-column responsive layout using Tailwind CSS.
- * - Interactive inline corrections: clicking on a highlighted correction calls a callback.
- * - Integration with CorrectionControls for bulk correction acceptance.
+ * This component displays a two-column interface for proofreading:
+ * - Left: Original text (plain)
+ * - Right: Corrected text with <mark> highlights
  *
  * @dependencies
- * - React: For component creation and state management.
- * - CorrectionControls: For providing bulk correction control buttons.
+ * - React for rendering
+ * - CorrectionControls (optional) for accept-all, etc.
  *
  * @notes
- * - The corrected text is rendered using dangerouslySetInnerHTML.
- * - Event delegation is used to capture clicks on <mark> elements.
- * - Assumes that the <mark> elements may have an optional data attribute 'data-correction-id'
- *   (if available) or will use the text content as an identifier.
+ * - This is an optional component that you can integrate into your pages.
+ * - The key idea is that 'originalText' is raw, 'correctedText' has <mark>.
  */
 
 import React, { FC, MouseEvent } from 'react';
 import CorrectionControls from './CorrectionControls';
 
 export interface ProofreadingInterfaceProps {
+  /**
+   * Plain original text
+   */
   originalText: string;
-  correctedText: string; // HTML string containing inline <mark> tags
-  onAcceptIndividual: (correctionIdentifier: string) => void;
-  onAcceptAll: () => void;
+
+  /**
+   * Highlighted corrected text, containing <mark> tags
+   */
+  correctedText: string;
+
+  /**
+   * Callback for accepting an individual correction (optional)
+   */
+  onAcceptIndividual?: (correctionIdentifier: string) => void;
+
+  /**
+   * Callback for accepting all corrections in bulk
+   */
+  onAcceptAll?: () => void;
 }
 
 const ProofreadingInterface: FC<ProofreadingInterfaceProps> = ({
@@ -40,17 +45,10 @@ const ProofreadingInterface: FC<ProofreadingInterfaceProps> = ({
   onAcceptIndividual,
   onAcceptAll,
 }) => {
-  /**
-   * Handle click events on the corrected text container.
-   * If a <mark> element is clicked, extract its identifier (from a data attribute if available,
-   * otherwise its text content) and trigger the onAcceptIndividual callback.
-   *
-   * @param e - MouseEvent from the click on the corrected text container.
-   */
   const handleCorrectionClick = (e: MouseEvent<HTMLDivElement>) => {
+    if (!onAcceptIndividual) return;
     const target = e.target as HTMLElement;
     if (target.tagName.toLowerCase() === 'mark') {
-      // Use a data attribute if available, otherwise fallback to text content.
       const correctionId = target.getAttribute('data-correction-id') || target.textContent || '';
       if (correctionId) {
         onAcceptIndividual(correctionId);
@@ -77,16 +75,18 @@ const ProofreadingInterface: FC<ProofreadingInterfaceProps> = ({
           <h2 className="text-xl font-semibold mb-2">Corrected Text</h2>
           <div
             className="w-full h-64 p-2 border rounded overflow-auto whitespace-pre-wrap"
-            // Render the HTML that includes <mark> tags and attach click handler for inline corrections
             dangerouslySetInnerHTML={{ __html: correctedText }}
             onClick={handleCorrectionClick}
           />
         </div>
       </div>
-      {/* Correction Controls for bulk acceptance */}
-      <div className="mt-4">
-        <CorrectionControls onAcceptAll={onAcceptAll} />
-      </div>
+
+      {/* Optional Correction Controls */}
+      {onAcceptAll && (
+        <div className="mt-4">
+          <CorrectionControls onAcceptAll={onAcceptAll} />
+        </div>
+      )}
     </div>
   );
 };

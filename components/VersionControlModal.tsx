@@ -6,7 +6,8 @@
  *
  * Key features:
  * - Displays a list of previous versions with details such as version number and timestamp.
- * - Allows the user to select a version to rollback.
+ * - Allows the user to select a version to rollback (via "Rollback" in each row).
+ * - Includes a "Rollback to Original" button in the footer to revert to the file's original text.
  * - Includes a close button to exit the modal.
  *
  * @dependencies
@@ -15,42 +16,90 @@
  *
  * @notes
  * - The component expects to receive an array of version objects.
- * - It provides callbacks for closing the modal and performing rollback actions.
+ * - We now provide two rollback callbacks:
+ *   1) onRollbackVersion(versionId) – to rollback to a specific version from the table.
+ *   2) onRollbackOriginal() – to revert to the original text.
  * - Error handling includes basic validations to ensure versions are available.
  */
 
 import React, { FC } from 'react';
 
-// Define the interface for a single version entry.
+/**
+ * Defines a single version entry in the history.
+ */
 export interface Version {
+  /**
+   * The unique identifier for this version entry (log_id).
+   */
   id: string;
+
+  /**
+   * The version number (1, 2, 3, etc.).
+   */
   versionNumber: number;
+
+  /**
+   * A string representation of the timestamp when this version was created.
+   */
   timestamp: string;
-  description?: string; // Optional description of changes in this version.
+
+  /**
+   * Optional description of the version or changes.
+   */
+  description?: string;
 }
 
-// Define the props for the VersionControlModal component.
+/**
+ * Props for the VersionControlModal component.
+ */
 export interface VersionControlModalProps {
-  isOpen: boolean; // Determines if the modal is visible.
-  versions: Version[]; // Array of document versions.
-  onClose: () => void; // Callback to close the modal.
-  onRollback: (versionId: string) => void; // Callback to trigger rollback to a selected version.
+  /**
+   * Whether the modal is visible.
+   */
+  isOpen: boolean;
+
+  /**
+   * An array of versions to display in the modal.
+   */
+  versions: Version[];
+
+  /**
+   * Callback to close the modal.
+   */
+  onClose: () => void;
+
+  /**
+   * Callback to rollback to a specific version (triggered by the "Rollback" button in each row).
+   * @param versionId The unique ID of the version (usually the log_id in proofreading_logs).
+   */
+  onRollbackVersion: (versionId: string) => void;
+
+  /**
+   * Callback to rollback to the original text (triggered by the "Rollback to Original" button in the footer).
+   */
+  onRollbackOriginal: () => void;
 }
 
 /**
  * VersionControlModal Component
- * @param isOpen - Boolean flag to control modal visibility.
- * @param versions - Array of document versions to display.
- * @param onClose - Function to call when the modal should be closed.
- * @param onRollback - Function to call with the selected version id to perform a rollback.
+ * Displays a modal with a table of versions and two rollback options:
+ * - Per-version rollback
+ * - Rollback to original
+ *
+ * @param isOpen - Controls whether the modal is rendered.
+ * @param versions - The list of version objects to display.
+ * @param onClose - Closes the modal when called.
+ * @param onRollbackVersion - Function called when the user clicks "Rollback" on a specific version.
+ * @param onRollbackOriginal - Function called when the user clicks "Rollback to Original."
  */
 const VersionControlModal: FC<VersionControlModalProps> = ({
   isOpen,
   versions,
   onClose,
-  onRollback,
+  onRollbackVersion,
+  onRollbackOriginal,
 }) => {
-  // If the modal is not open, do not render anything.
+  // If the modal is not open, don't render anything.
   if (!isOpen) return null;
 
   return (
@@ -87,13 +136,15 @@ const VersionControlModal: FC<VersionControlModalProps> = ({
                 {versions.map((version) => (
                   <tr key={version.id} className="hover:bg-gray-100">
                     <td className="px-2 py-1 border-b">{version.versionNumber}</td>
-                    <td className="px-2 py-1 border-b">{new Date(version.timestamp).toLocaleString()}</td>
+                    <td className="px-2 py-1 border-b">
+                      {new Date(version.timestamp).toLocaleString()}
+                    </td>
                     <td className="px-2 py-1 border-b">
                       {version.description ? version.description : 'N/A'}
                     </td>
                     <td className="px-2 py-1 border-b">
                       <button
-                        onClick={() => onRollback(version.id)}
+                        onClick={() => onRollbackVersion(version.id)}
                         className="bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600 transition-colors"
                       >
                         Rollback
@@ -106,8 +157,14 @@ const VersionControlModal: FC<VersionControlModalProps> = ({
           )}
         </div>
 
-        {/* Modal footer */}
-        <div className="flex justify-end border-t px-4 py-2">
+        {/* Modal footer with "Rollback to Original" and "Close" */}
+        <div className="flex justify-end border-t px-4 py-2 space-x-2">
+          <button
+            onClick={() => onRollbackOriginal()}
+            className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition-colors"
+          >
+            Rollback to Original
+          </button>
           <button
             onClick={onClose}
             className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 transition-colors"

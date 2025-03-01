@@ -15,7 +15,7 @@
  *
  * @notes
  * - Assumes that file objects conform to the FileData interface.
- * - Action handlers for renaming, deleting, and proofreading are passed in as props.
+ * - Action handlers for renaming, deleting, proofreading, and viewing version history are passed in as props.
  */
 
 import React from 'react';
@@ -38,6 +38,7 @@ interface FileListProps {
   onRename: (fileId: string, newName: string) => void;
   onDelete: (fileId: string) => void;
   onProofread: (fileId: string) => void;
+  onViewVersions: (fileId: string) => void; // New prop for version history
 }
 
 /**
@@ -46,8 +47,9 @@ interface FileListProps {
  * @param onRename - Callback for renaming a file.
  * @param onDelete - Callback for deleting a file.
  * @param onProofread - Callback to initiate proofreading for a file.
+ * @param onViewVersions - Callback to view the version history for a file.
  */
-const FileList: React.FC<FileListProps> = ({ files, onRename, onDelete, onProofread }) => {
+const FileList: React.FC<FileListProps> = ({ files, onRename, onDelete, onProofread, onViewVersions }) => {
   return (
     <div className="space-y-4">
       {files.length === 0 ? (
@@ -60,6 +62,7 @@ const FileList: React.FC<FileListProps> = ({ files, onRename, onDelete, onProofr
             onRename={onRename}
             onDelete={onDelete}
             onProofread={onProofread}
+            onViewVersions={onViewVersions}
           />
         ))
       )}

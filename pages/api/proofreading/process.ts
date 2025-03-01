@@ -1,29 +1,29 @@
 /**
  * @file pages/api/proofreading/process.ts
  * @description
- * Questo endpoint API gestisce il processo di proofreading per un file.
- * I passaggi sono:
- *  1. Validazione della richiesta e estrazione del file_id.
- *  2. Recupero del record del file dal database.
- *  3. Aggiornamento dello stato del file a "in-progress".
- *  4. Download del file dallo storage Supabase ed estrazione del testo.
- *  5. Invocazione dell'API OpenAI per il proofreading del testo.
- *  6. Calcolo di un diff carattere per carattere per evidenziare ogni modifica.
- *  7. Salvataggio del testo corretto (sia raw che diff-based) in proofreading_logs.
- *  8. Aggiornamento dello stato del file a "complete".
- *  9. Restituzione di un messaggio di successo.
+ * This endpoint handles the proofreading process for a file. It:
+ *  1. Fetches the file record from the DB.
+ *  2. Updates the file's status to 'in-progress'.
+ *  3. Downloads and extracts the file text from Supabase Storage.
+ *  4. Calls OpenAI to get a corrected version of the text.
+ *  5. Generates a diff-based highlighted version of the text (<mark> tags).
+ *  6. Saves both the plain corrected text and the highlighted text to proofreading_logs.
+ *  7. Updates the file's current_text with the plain corrected text (no <mark> tags),
+ *     so that we don't store leftover HTML markup.
+ *  8. Sets proofreading_status to 'complete'.
+ *
+ * Key changes:
+ * - We only store the plain corrected text (proofreadingResult.correctedText) in `files.current_text`,
+ *   avoiding leftover <mark> tags in the final text.
  *
  * @dependencies
- * - Tipi API di Next.js
- * - Drizzle ORM (files, proofreadingLogs)
- * - Supabase Auth Helpers per operazioni server-side di storage (usando createPagesServerClient)
- * - extractTextFromFile da services/textExtractor
- * - proofreadDocument da services/openaiService
- * - highlightDifferences da services/diffHighlighter
- * - Logger per il logging
- *
- * @notes
- * - Assicurati di aver installato diff-match-patch.
+ * - Next.js API types for request/response
+ * - Drizzle ORM for DB queries
+ * - Supabase Auth Helpers for server-side storage
+ * - textExtractor for reading the doc
+ * - openaiService for calling the LLM
+ * - diffHighlighter for generating <mark>-based diffs
+ * - Logger for logging
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -39,7 +39,7 @@ import Logger from '../../../services/logger';
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   Logger.info(`Proofreading process endpoint invoked with method ${req.method}.`);
 
-  // Consenti solo richieste POST.
+  // Only POST is allowed
   if (req.method !== 'POST') {
     Logger.warn('Method not allowed on proofreading process endpoint.');
     return res.status(405).json({ error: 'Method not allowed. Only POST requests are accepted.' });
@@ -52,7 +52,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    // Recupera il record del file
+    // 1. Retrieve the file record
     const fileRecords = await drizzleClient.select().from(files).where(eq(files.file_id, file_id));
     if (!fileRecords || fileRecords.length === 0) {
       Logger.error(`File not found for file_id: ${file_id}`);
@@ -60,14 +60,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     const fileRecord = fileRecords[0];
 
-    // Aggiorna lo stato del file a 'in-progress'
+    // 2. Update file status to 'in-progress'
     await drizzleClient
       .update(files)
       .set({ proofreading_status: 'in-progress' })
       .where(eq(files.file_id, file_id));
     Logger.info(`Proofreading status updated to 'in-progress' for file_id: ${file_id}`);
 
-    // Scarica il file dallo storage Supabase
+    // 3. Download the file from Supabase Storage
     const supabase = createPagesServerClient({ req, res });
     const bucketName = 'uploads';
     const { data: downloadData, error: downloadError } = await supabase.storage
@@ -76,7 +76,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (downloadError || !downloadData) {
       Logger.error(`Failed to download file: ${downloadError?.message}`);
-      // Ripristina lo stato a 'pending' in caso di errore nel download
+      // revert status
       await drizzleClient
         .update(files)
         .set({ proofreading_status: 'pending' })
@@ -85,11 +85,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     Logger.info(`File downloaded successfully for file_id: ${file_id}`);
 
-    // Converti il Blob scaricato in un Buffer
+    // Convert the downloaded Blob to a Buffer
     const arrayBuffer = await downloadData.arrayBuffer();
     const fileBuffer = Buffer.from(new Uint8Array(arrayBuffer));
 
-    // Estrai il testo dal file
+    // 4. Extract text from the file
     const fileType = fileRecord.file_type.toLowerCase() as SupportedFileType;
     let extractedText: string;
     try {
@@ -97,7 +97,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       Logger.info(`Text extraction successful for file_id: ${file_id}`);
     } catch (extractionError: any) {
       Logger.error(`Text extraction failed: ${extractionError.message}`);
-      // Ripristina lo stato a 'pending' in caso di errore nell'estrazione
       await drizzleClient
         .update(files)
         .set({ proofreading_status: 'pending' })
@@ -105,7 +104,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(500).json({ error: `Text extraction failed: ${extractionError.message}` });
     }
 
-    // Chiama l'API OpenAI per il proofreading del testo
+    // 5. Call OpenAI to get a corrected version
     let correctedText: string;
     try {
       const proofreadingResult = await proofreadDocument(extractedText);
@@ -113,7 +112,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       Logger.info(`Proofreading successful for file_id: ${file_id}`);
     } catch (llmError: any) {
       Logger.error(`Proofreading failed: ${llmError.message}`);
-      // Ripristina lo stato a 'pending' in caso di errore nell'API LLM
       await drizzleClient
         .update(files)
         .set({ proofreading_status: 'pending' })
@@ -121,27 +119,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(500).json({ error: `Proofreading failed: ${llmError.message}` });
     }
 
-    // Esegui un diff carattere per carattere per evidenziare ogni modifica
+    // 6. Generate a diff-based highlighted version (with <mark> tags)
     const fullyHighlighted = highlightDifferences(extractedText, correctedText);
 
-    // Salva il risultato in proofreading_logs
+    // 7. Insert a proofreading log (storing both raw text & <mark> text)
     await drizzleClient.insert(proofreadingLogs).values({
-      file_id: file_id,
+      file_id,
       corrections: {
         rawCorrectedText: correctedText,
-        correctedText: fullyHighlighted, // Contiene i tag <mark> per ogni differenza
+        correctedText: fullyHighlighted,
       },
     });
-    Logger.info(`Proofreading result logged for file_id: ${file_id}`);
+    Logger.info(`Proofreading log inserted for file_id: ${file_id}`);
 
-    // Aggiorna lo stato del file a 'complete'
+    // 8. Update the file's current_text with the plain corrected text
     await drizzleClient
       .update(files)
-      .set({ proofreading_status: 'complete' })
+      .set({
+        proofreading_status: 'complete',
+        // Notice we store the plain corrected text, not the highlight with <mark> tags
+        current_text: correctedText,
+      })
       .where(eq(files.file_id, file_id));
-    Logger.info(`Proofreading status updated to 'complete' for file_id: ${file_id}`);
 
-    // Restituisce un messaggio di successo
+    Logger.info(`Proofreading status updated to 'complete' and current_text replaced for file_id: ${file_id}`);
+
     return res.status(200).json({
       message: 'Proofreading completed successfully.',
       correctedText: fullyHighlighted,
