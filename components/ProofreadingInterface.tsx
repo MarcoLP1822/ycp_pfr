@@ -4,11 +4,10 @@
  * This component renders a split-view interface for proofreading:
  * - Left side displays the original plain text.
  * - Right side displays the corrected text with inline highlights (<mark> tags).
- * 
- * Enhancements:
- * - Uses a subtle mocha-light background for the container.
- * - Includes smooth transition effects on the text areas.
- * - Applies modern typography and ample white space.
+ *
+ * Enhancements in this update:
+ * - Confirmed responsive grid layout for different devices.
+ * - Added micro-interaction effects (active scale transformation) on the corrected text container.
  *
  * Key features:
  * - Split-view layout for clear differentiation.
@@ -20,7 +19,6 @@
  *
  * @notes
  * - Ensure that the Tailwind configuration includes the mocha color palette.
- * - This component is designed to be responsive and works well on various devices.
  */
 
 import React, { FC, MouseEvent } from 'react';
@@ -67,7 +65,7 @@ const ProofreadingInterface: FC<ProofreadingInterfaceProps> = ({
   };
 
   return (
-    <div className="p-6 bg-mocha-light min-h-screen">
+    <div className="p-4 sm:p-6 bg-mocha-light min-h-screen">
       <h1 className="text-3xl font-bold mb-6 text-mocha-dark">Proofreading Interface</h1>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Original Text Column */}
@@ -79,17 +77,18 @@ const ProofreadingInterface: FC<ProofreadingInterfaceProps> = ({
             value={originalText}
           />
         </div>
-        {/* Corrected Text Column */}
-        <div className="bg-white p-4 rounded shadow transition-all duration-300">
+        {/* Corrected Text Column with micro-interaction */}
+        <div
+          className="bg-white p-4 rounded shadow transition-all duration-300 transform hover:scale-105 active:scale-95 overflow-auto whitespace-pre-wrap border border-mocha-light"
+          onClick={handleCorrectionClick}
+        >
           <h2 className="text-xl font-semibold mb-3 text-mocha-dark">Corrected Text</h2>
           <div
-            className="w-full h-72 p-3 border border-mocha-light rounded overflow-auto whitespace-pre-wrap transition-all duration-300"
+            className="w-full h-72 p-3 transition-all duration-300"
             dangerouslySetInnerHTML={{ __html: correctedText }}
-            onClick={handleCorrectionClick}
           />
         </div>
       </div>
-      {/* Optional Correction Controls */}
       {onAcceptAll && (
         <div className="mt-6">
           <CorrectionControls onAcceptAll={onAcceptAll} />

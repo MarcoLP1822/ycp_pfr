@@ -2,10 +2,12 @@
  * @file pages/dashboard.tsx
  * @description
  * Dashboard page that integrates file upload, file listing, and version control.
- * The file list is fetched from the backend and displayed via <FileList>.
  * Users can trigger renaming, deletion, proofreading, and view version history.
- * When viewing version history, the modal provides two rollback options:
- * one for rolling back to a specific version and one to revert to the original text.
+ * When viewing version history, the modal provides two rollback options.
+ *
+ * Enhancements in this update:
+ * - Updated outer container with responsive padding classes for improved layout on mobile, tablet, and desktop.
+ * - Ensured all child components (FileUpload, FileList, VersionControlModal) benefit from the updated responsive and micro-interaction enhancements.
  *
  * @dependencies
  * - React for state management.
@@ -26,7 +28,6 @@ const Dashboard: React.FC = () => {
   const [files, setFiles] = useState<FileData[]>([]);
   const router = useRouter();
 
-  // State for version control modal
   const [showVersionModal, setShowVersionModal] = useState<boolean>(false);
   const [versionModalFileId, setVersionModalFileId] = useState<string | null>(null);
   const [versions, setVersions] = useState<Version[]>([]);
@@ -104,7 +105,6 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  // When a file's "Version History" button is clicked.
   const handleViewVersions = async (fileId: string) => {
     try {
       const response = await fetch(`/api/files/versions?fileId=${fileId}`);
@@ -121,7 +121,6 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  // Callback to rollback to a specific version.
   const handleRollbackVersion = async (versionId: string) => {
     if (!versionModalFileId) return;
     try {
@@ -145,7 +144,6 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  // Callback to rollback to the original text.
   const handleRollbackOriginal = async () => {
     if (!versionModalFileId) return;
     try {
@@ -176,7 +174,7 @@ const Dashboard: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 p-6">
+    <div className="min-h-screen bg-gray-100 p-4 sm:p-6 md:p-8 transition-all duration-300">
       <h1 className="text-3xl font-bold mb-6">Dashboard</h1>
       <div className="mb-8">
         <FileUpload />

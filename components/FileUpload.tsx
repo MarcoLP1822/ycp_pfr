@@ -3,7 +3,11 @@
  * @description
  * This component handles uploading files to Supabase Storage and creates a corresponding record in the
  * `files` table by calling the `/api/files/upload` endpoint.
- * Accessibility enhancements include ARIA roles for error and success messages, and descriptive aria-labels for interactive elements.
+ * 
+ * Enhancements in this update:
+ * - Added responsive padding classes for better layout on different screen sizes.
+ * - Incorporated micro-interaction effects (scale transitions) on the container and upload button.
+ * - Maintained clear calls-to-action and error/success messaging with smooth transitions.
  *
  * Key features:
  * - Validates file extension before uploading (doc, docx, odt, odf, txt).
@@ -14,7 +18,7 @@
  * @dependencies
  * - React: For component creation.
  * - @supabase/auth-helpers-react: For session and supabase client.
- * - Tailwind CSS: For styling.
+ * - Tailwind CSS: For styling and responsive design.
  *
  * @notes
  * - Ensure that your Tailwind configuration includes the mocha color palette.
@@ -24,7 +28,6 @@
 import React, { useState, ChangeEvent } from 'react';
 import { useSupabaseClient, useSession } from '@supabase/auth-helpers-react';
 
-// Define the allowed file extensions
 const allowedExtensions = ['doc', 'docx', 'odt', 'odf', 'txt'];
 
 const FileUpload: React.FC = () => {
@@ -64,7 +67,6 @@ const FileUpload: React.FC = () => {
       setErrorMessage('Please select a file before uploading.');
       return;
     }
-    // Ensure user is logged in
     if (!session?.user?.id) {
       setErrorMessage('You must be logged in to upload a file.');
       return;
@@ -75,7 +77,6 @@ const FileUpload: React.FC = () => {
     setUploadSuccess('');
 
     try {
-      // Generate a unique file name and upload to the 'uploads' bucket.
       const fileName = `${Date.now()}-${selectedFile.name}`;
       const bucketName = 'uploads';
 
@@ -90,11 +91,9 @@ const FileUpload: React.FC = () => {
         return;
       }
 
-      // Determine the file extension and URL/path from storage.
       const fileExtension = (selectedFile.name.split('.').pop() || '').toLowerCase();
       const fileUrl = data?.path || fileName;
 
-      // Prepare file metadata for the API call.
       const bodyData = {
         user_id: session.user.id,
         file_name: selectedFile.name,
@@ -116,7 +115,6 @@ const FileUpload: React.FC = () => {
         return;
       }
 
-      // Successfully updated the database.
       setUploadSuccess('File uploaded and database updated successfully.');
       setSelectedFile(null);
     } catch (uploadError: any) {
@@ -128,25 +126,29 @@ const FileUpload: React.FC = () => {
   };
 
   return (
-    <div className="p-6 border border-mocha rounded shadow-sm bg-white">
+    <div className="p-4 sm:p-6 border border-mocha rounded shadow-sm bg-white transition-transform duration-200 hover:scale-105">
       <h2 className="text-2xl font-semibold mb-4 text-mocha-dark">Upload Document</h2>
       {errorMessage && (
-        <p role="alert" className="text-mocha-dark mb-2 bg-mocha-light p-2 rounded">{errorMessage}</p>
+        <p role="alert" className="text-mocha-dark mb-2 bg-mocha-light p-2 rounded">
+          {errorMessage}
+        </p>
       )}
       {uploadSuccess && (
-        <p role="status" className="text-mocha mb-2 bg-mocha-light p-2 rounded">{uploadSuccess}</p>
+        <p role="status" className="text-mocha mb-2 bg-mocha-light p-2 rounded">
+          {uploadSuccess}
+        </p>
       )}
       <input
         type="file"
         accept=".doc,.docx,.odt,.odf,.txt"
         onChange={handleFileChange}
-        className="mb-4 w-full border border-mocha rounded p-2 focus:outline-none focus:ring-2 focus:ring-mocha-light transition-colors"
+        className="mb-4 w-full border border-mocha rounded p-2 focus:outline-none focus:ring-2 focus:ring-mocha-light transition-colors duration-300"
         aria-label="File Upload Input"
       />
       <button
         onClick={handleUpload}
         disabled={uploading}
-        className="w-full bg-mocha text-white py-3 px-4 rounded transition-colors duration-300 hover:bg-mocha-light focus:outline-none focus:ring-2 focus:ring-mocha-light"
+        className="w-full bg-mocha text-white py-3 px-4 rounded transition-transform transform active:scale-95 hover:scale-105 duration-200 focus:outline-none focus:ring-2 focus:ring-mocha-light"
         aria-label="Upload file"
       >
         {uploading ? 'Uploading...' : 'Upload'}
