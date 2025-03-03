@@ -1,15 +1,14 @@
 /**
  * @file components/FileUpload.tsx
  * @description
- * This component handles uploading files to Supabase Storage and also
- * creates a corresponding record in the `files` table by calling
- * the `/api/files/upload` endpoint.
+ * This component handles uploading files to Supabase Storage and creates a corresponding record in the
+ * `files` table by calling the `/api/files/upload` endpoint.
  *
  * Key features:
  * - Validates file extension before uploading (doc, docx, odt, odf, txt).
- * - Uploads the file to the 'uploads' bucket in Supabase Storage.
- * - Calls `/api/files/upload` to insert a row in the `files` table.
- * - Shows progress and error messages to the user.
+ * - Uses the mocha color palette for a modern, sleek, and minimalist UI.
+ * - Provides clear calls-to-action and smooth transition effects on buttons and inputs.
+ * - Displays error and success messages styled with mocha colors.
  *
  * @dependencies
  * - React: For component creation.
@@ -17,11 +16,8 @@
  * - Tailwind CSS: For styling.
  *
  * @notes
- * - Make sure you have the bucket named 'uploads' in your Supabase project.
- * - Ensure that the `/api/files/upload` route is correctly implemented
- *   (it should insert a row in the `files` table).
- * - If you want to see your files in `GET /api/files/list`, you must
- *   insert them into the database, not just upload to storage.
+ * - Ensure that your Tailwind configuration includes the mocha color palette.
+ * - Verify file validation messages and upload button responsiveness on various devices.
  */
 
 import React, { useState, ChangeEvent } from 'react';
@@ -40,7 +36,7 @@ const FileUpload: React.FC = () => {
   const [uploadSuccess, setUploadSuccess] = useState<string>('');
 
   /**
-   * Handle file selection and validate the file extension.
+   * Handles file selection and validates the file extension.
    * @param e - The file input change event.
    */
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -59,7 +55,7 @@ const FileUpload: React.FC = () => {
   };
 
   /**
-   * Upload the selected file to Supabase Storage, then call `/api/files/upload`
+   * Uploads the selected file to Supabase Storage, then calls `/api/files/upload`
    * to insert a row in the `files` table.
    */
   const handleUpload = async () => {
@@ -67,7 +63,7 @@ const FileUpload: React.FC = () => {
       setErrorMessage('Please select a file before uploading.');
       return;
     }
-    // Ensure user is logged in if we need a user_id
+    // Ensure user is logged in
     if (!session?.user?.id) {
       setErrorMessage('You must be logged in to upload a file.');
       return;
@@ -78,9 +74,9 @@ const FileUpload: React.FC = () => {
     setUploadSuccess('');
 
     try {
-      // 1. Upload to Supabase Storage
+      // Generate a unique file name and upload to the 'uploads' bucket.
       const fileName = `${Date.now()}-${selectedFile.name}`;
-      const bucketName = 'uploads'; // Make sure your bucket is named "uploads"
+      const bucketName = 'uploads';
 
       const { data, error: uploadError } = await supabase.storage
         .from(bucketName)
@@ -93,16 +89,16 @@ const FileUpload: React.FC = () => {
         return;
       }
 
-      // 2. Insert a row in the `files` table via `/api/files/upload`
+      // Determine the file extension and URL/path from storage.
       const fileExtension = (selectedFile.name.split('.').pop() || '').toLowerCase();
-      const fileUrl = data?.path || fileName; // The path in your bucket
+      const fileUrl = data?.path || fileName;
 
-      // Prepare the POST request body
+      // Prepare file metadata for the API call.
       const bodyData = {
-        user_id: session.user.id,     // from the user's session
-        file_name: selectedFile.name, // original filename
-        file_type: fileExtension,     // doc, docx, odt, odf, txt
-        file_url: fileUrl,            // the path returned by Supabase
+        user_id: session.user.id,
+        file_name: selectedFile.name,
+        file_type: fileExtension,
+        file_url: fileUrl,
       };
 
       const response = await fetch('/api/files/upload', {
@@ -114,14 +110,12 @@ const FileUpload: React.FC = () => {
       if (!response.ok) {
         const errorBody = await response.json();
         console.error('Error inserting file metadata:', errorBody);
-        setErrorMessage(
-          `Database insertion failed: ${errorBody.error || 'Unknown error'}`
-        );
+        setErrorMessage(`Database insertion failed: ${errorBody.error || 'Unknown error'}`);
         setUploading(false);
         return;
       }
 
-      // Successfully inserted row in DB
+      // Successfully updated the database.
       setUploadSuccess('File uploaded and database updated successfully.');
       setSelectedFile(null);
     } catch (uploadError: any) {
@@ -133,20 +127,24 @@ const FileUpload: React.FC = () => {
   };
 
   return (
-    <div className="p-4 border rounded shadow-sm bg-white">
-      <h2 className="text-xl font-semibold mb-4">Upload Document</h2>
-      {errorMessage && <p className="text-red-500 mb-2">{errorMessage}</p>}
-      {uploadSuccess && <p className="text-green-500 mb-2">{uploadSuccess}</p>}
+    <div className="p-6 border border-mocha rounded shadow-sm bg-white">
+      <h2 className="text-2xl font-semibold mb-4 text-mocha-dark">Upload Document</h2>
+      {errorMessage && (
+        <p className="text-mocha-dark mb-2 bg-mocha-light p-2 rounded">{errorMessage}</p>
+      )}
+      {uploadSuccess && (
+        <p className="text-mocha mb-2 bg-mocha-light p-2 rounded">{uploadSuccess}</p>
+      )}
       <input
         type="file"
         accept=".doc,.docx,.odt,.odf,.txt"
         onChange={handleFileChange}
-        className="mb-4"
+        className="mb-4 w-full border border-mocha rounded p-2 focus:outline-none focus:ring-2 focus:ring-mocha-light transition-colors"
       />
       <button
         onClick={handleUpload}
         disabled={uploading}
-        className="bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 transition-colors"
+        className="w-full bg-mocha text-white py-3 px-4 rounded transition-colors duration-300 hover:bg-mocha-light focus:outline-none focus:ring-2 focus:ring-mocha-light"
       >
         {uploading ? 'Uploading...' : 'Upload'}
       </button>
