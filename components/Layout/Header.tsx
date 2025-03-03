@@ -2,21 +2,22 @@
  * @file components/Layout/Header.tsx
  * @description
  * This component renders the header for the web app layout.
- * It displays the application branding and provides navigation controls,
- * such as a login link or a logout button if the user is authenticated.
- * 
+ * It now incorporates the custom mocha color palette for a modern, sleek, and minimalist design.
+ * The header uses a dark mocha background with contrasting white text and updated button styles
+ * for login/logout actions with smooth transitions.
+ *
  * Key features:
- * - Displays the app logo/name as a clickable link.
- * - Shows a login button when the user is not authenticated.
- * - Shows a logout button when the user is authenticated.
- * 
+ * - Uses mocha-dark as the header background.
+ * - Applies a modern typography with increased spacing.
+ * - Provides login/logout buttons styled with the mocha color palette and smooth transitions.
+ *
  * @dependencies
  * - React: For creating the component.
- * - Next.js Link: For navigation between pages.
- * 
+ * - Next.js Link: For client-side navigation.
+ *
  * @notes
- * - The component accepts optional props for user information and a logout handler.
- * - In a full implementation, the authentication state would be managed by context or a global state manager.
+ * - Ensure that the Tailwind configuration includes the mocha color palette.
+ * - The header is responsive and its layout remains minimalistic across devices.
  */
 
 import React from 'react';
@@ -29,11 +30,11 @@ export interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ user, onLogout }) => {
   return (
-    <header className="bg-gray-800 text-white flex justify-between items-center p-4">
+    <header className="bg-mocha-dark text-white flex justify-between items-center px-6 py-4 shadow-md">
       {/* Application branding */}
-      <div className="text-xl font-bold">
+      <div className="text-2xl font-bold">
         <Link href="/">
-          <a>Proofreading App</a>
+          <a className="hover:text-mocha-light transition-colors duration-300">Proofreading App</a>
         </Link>
       </div>
       {/* Navigation controls */}
@@ -41,13 +42,13 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout }) => {
         {user ? (
           <button
             onClick={onLogout}
-            className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded transition-colors"
+            className="bg-mocha hover:bg-mocha-light text-white px-4 py-2 rounded transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-mocha-light"
           >
             Logout
           </button>
         ) : (
           <Link href="/">
-            <a className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded transition-colors">
+            <a className="bg-mocha hover:bg-mocha-light text-white px-4 py-2 rounded transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-mocha-light">
               Login
             </a>
           </Link>
