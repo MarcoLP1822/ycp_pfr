@@ -2,14 +2,15 @@
  * @file components/Layout/MainLayout.tsx
  * @description
  * This component provides the overall layout structure for the application.
- * It includes a header at the top, a sidebar for navigation, and a main content area for page-specific content.
- * The layout has been refined to ensure consistency with the updated Header and Sidebar styles,
- * providing ample white space and a modern, minimalist aesthetic.
+ * It includes a header at the top, a sidebar for navigation, and a main content area
+ * that has been refined to ensure consistency with the updated Header and Sidebar styles.
+ * The layout now uses increased padding to provide ample white space and adheres to a
+ * modern, minimalist design aesthetic.
  *
  * Key features:
- * - Uses a light background for a clean look.
- * - Provides increased padding and a centered content container for improved readability.
- * - Integrates the Header and Sidebar components seamlessly.
+ * - Incorporates a top header with updated branding and authentication controls.
+ * - Provides a responsive sidebar that aligns with the mocha color palette.
+ * - Uses a centered container with increased padding for the main content.
  *
  * @dependencies
  * - React: For component creation.
@@ -17,8 +18,8 @@
  * - Sidebar: Provides navigation links on the side.
  *
  * @notes
- * - Accepts optional user and onLogout props to pass down to the Header.
- * - This layout should be used as a wrapper in pages that require the full application layout.
+ * - This layout is intended as a wrapper for pages requiring the full application layout.
+ * - Adjustments have been made to padding and background colors to enhance the minimalist design.
  */
 
 import React from 'react';
@@ -31,13 +32,15 @@ export interface MainLayoutProps extends HeaderProps {
 
 const MainLayout: React.FC<MainLayoutProps> = ({ children, user, onLogout }) => {
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
+    <div className="min-h-screen bg-gray-100 flex flex-col">
       {/* Top Header */}
       <Header user={user} onLogout={onLogout} />
-      {/* Layout with sidebar and main content */}
+      {/* Main layout container with sidebar and content */}
       <div className="flex flex-1">
+        {/* Sidebar for navigation */}
         <Sidebar />
-        <main className="flex-1 p-8 bg-white">
+        {/* Main content area with increased padding for ample white space */}
+        <main className="flex-1 p-10 bg-white">
           {/* Centered container for consistent content width */}
           <div className="max-w-7xl mx-auto">
             {children}
