@@ -3,9 +3,8 @@
  * @description
  * This component renders a collapsible sidebar for the application.
  * It provides a navigation menu that is responsive and uses the mocha color palette,
- * aligning with a modern, sleek, and minimalist design. The sidebar is collapsible
- * on mobile devices with a toggle button (hamburger icon), while it remains permanently
- * visible on larger screens.
+ * aligning with a modern, sleek, and minimalist design.
+ * Accessibility enhancements include explicit aria-labels for navigation.
  *
  * Key features:
  * - Collapsible menu on mobile devices with smooth transitions.
@@ -49,7 +48,7 @@ const Sidebar: React.FC = () => {
                     ${isCollapsed ? '-translate-x-full' : 'translate-x-0'} 
                     md:translate-x-0 md:block fixed md:relative z-50`}
       >
-        <nav className="space-y-4">
+        <nav className="space-y-4" aria-label="Sidebar Navigation">
           <Link href="/dashboard">
             <a className="block px-2 py-1 hover:bg-mocha hover:text-white rounded transition-colors">
               Dashboard

@@ -3,6 +3,7 @@
  * @description
  * This component handles uploading files to Supabase Storage and creates a corresponding record in the
  * `files` table by calling the `/api/files/upload` endpoint.
+ * Accessibility enhancements include ARIA roles for error and success messages, and descriptive aria-labels for interactive elements.
  *
  * Key features:
  * - Validates file extension before uploading (doc, docx, odt, odf, txt).
@@ -130,21 +131,23 @@ const FileUpload: React.FC = () => {
     <div className="p-6 border border-mocha rounded shadow-sm bg-white">
       <h2 className="text-2xl font-semibold mb-4 text-mocha-dark">Upload Document</h2>
       {errorMessage && (
-        <p className="text-mocha-dark mb-2 bg-mocha-light p-2 rounded">{errorMessage}</p>
+        <p role="alert" className="text-mocha-dark mb-2 bg-mocha-light p-2 rounded">{errorMessage}</p>
       )}
       {uploadSuccess && (
-        <p className="text-mocha mb-2 bg-mocha-light p-2 rounded">{uploadSuccess}</p>
+        <p role="status" className="text-mocha mb-2 bg-mocha-light p-2 rounded">{uploadSuccess}</p>
       )}
       <input
         type="file"
         accept=".doc,.docx,.odt,.odf,.txt"
         onChange={handleFileChange}
         className="mb-4 w-full border border-mocha rounded p-2 focus:outline-none focus:ring-2 focus:ring-mocha-light transition-colors"
+        aria-label="File Upload Input"
       />
       <button
         onClick={handleUpload}
         disabled={uploading}
         className="w-full bg-mocha text-white py-3 px-4 rounded transition-colors duration-300 hover:bg-mocha-light focus:outline-none focus:ring-2 focus:ring-mocha-light"
+        aria-label="Upload file"
       >
         {uploading ? 'Uploading...' : 'Upload'}
       </button>

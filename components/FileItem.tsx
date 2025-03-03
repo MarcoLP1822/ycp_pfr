@@ -4,6 +4,7 @@
  * This component represents an individual file item in the file list.
  * It displays file information (name, type, and proofreading status) and provides
  * action buttons for renaming, deleting, initiating proofreading, and viewing version history.
+ * Accessibility enhancements include descriptive aria-labels on interactive elements.
  *
  * Key features:
  * - Toggle between display and edit mode for renaming with input auto-saving.
@@ -59,6 +60,7 @@ const FileItem: React.FC<FileItemProps> = ({ file, onRename, onDelete, onProofre
             onBlur={handleRename}
             className="border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-mocha-light"
             autoFocus
+            aria-label="File name input"
           />
         ) : (
           // Display the file name when not editing.
@@ -72,6 +74,7 @@ const FileItem: React.FC<FileItemProps> = ({ file, onRename, onDelete, onProofre
         <button
           onClick={() => setIsEditing(true)}
           className="bg-mocha text-white px-2 py-1 rounded hover:bg-mocha-light transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-mocha-light"
+          aria-label={`Rename file ${file.file_name}`}
         >
           Rename
         </button>
@@ -79,6 +82,7 @@ const FileItem: React.FC<FileItemProps> = ({ file, onRename, onDelete, onProofre
         <button
           onClick={() => onDelete(file.file_id)}
           className="bg-mocha-dark text-white px-2 py-1 rounded hover:bg-mocha transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-mocha-light"
+          aria-label={`Delete file ${file.file_name}`}
         >
           Delete
         </button>
@@ -86,6 +90,7 @@ const FileItem: React.FC<FileItemProps> = ({ file, onRename, onDelete, onProofre
         <button
           onClick={() => onProofread(file.file_id)}
           className="bg-mocha text-white px-2 py-1 rounded hover:bg-mocha-light transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-mocha-light"
+          aria-label={`Proofread file ${file.file_name}`}
         >
           Proofread
         </button>
@@ -93,6 +98,7 @@ const FileItem: React.FC<FileItemProps> = ({ file, onRename, onDelete, onProofre
         <button
           onClick={() => onViewVersions(file.file_id)}
           className="bg-mocha-light text-white px-2 py-1 rounded hover:bg-mocha transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-mocha-light"
+          aria-label={`View version history for file ${file.file_name}`}
         >
           Version History
         </button>

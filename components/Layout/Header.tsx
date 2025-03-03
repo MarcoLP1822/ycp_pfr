@@ -2,14 +2,13 @@
  * @file components/Layout/Header.tsx
  * @description
  * This component renders the header for the web app layout.
- * It now incorporates the custom mocha color palette for a modern, sleek, and minimalist design.
- * The header uses a dark mocha background with contrasting white text and updated button styles
- * for login/logout actions with smooth transitions.
+ * It incorporates the custom mocha color palette and a modern, sleek, minimalist design.
+ * Accessibility enhancements include explicit aria-labels on interactive elements.
  *
  * Key features:
  * - Uses mocha-dark as the header background.
- * - Applies a modern typography with increased spacing.
- * - Provides login/logout buttons styled with the mocha color palette and smooth transitions.
+ * - Improved keyboard accessibility with focus rings.
+ * - Explicit aria-labels for login/logout actions and navigation.
  *
  * @dependencies
  * - React: For creating the component.
@@ -34,21 +33,30 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout }) => {
       {/* Application branding */}
       <div className="text-2xl font-bold">
         <Link href="/">
-          <a className="hover:text-mocha-light transition-colors duration-300">Proofreading App</a>
+          <a 
+            className="hover:text-mocha-light transition-colors duration-300"
+            aria-label="Go to Home"
+          >
+            Proofreading App
+          </a>
         </Link>
       </div>
       {/* Navigation controls */}
-      <nav>
+      <nav aria-label="Main Navigation">
         {user ? (
           <button
             onClick={onLogout}
             className="bg-mocha hover:bg-mocha-light text-white px-4 py-2 rounded transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-mocha-light"
+            aria-label="Logout"
           >
             Logout
           </button>
         ) : (
           <Link href="/">
-            <a className="bg-mocha hover:bg-mocha-light text-white px-4 py-2 rounded transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-mocha-light">
+            <a
+              className="bg-mocha hover:bg-mocha-light text-white px-4 py-2 rounded transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-mocha-light"
+              aria-label="Login"
+            >
               Login
             </a>
           </Link>

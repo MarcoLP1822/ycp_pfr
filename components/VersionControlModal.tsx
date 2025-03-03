@@ -3,6 +3,7 @@
  * @description
  * This component provides a modernized modal interface for displaying the version history of a document.
  * It allows users to view previous versions and rollback changes if necessary.
+ * Accessibility improvements include proper ARIA roles, labeling, and keyboard focus management.
  *
  * Key features:
  * - Displays a list of previous versions with details such as version number and timestamp.
@@ -106,6 +107,8 @@ const VersionControlModal: FC<VersionControlModalProps> = ({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 transition-opacity duration-300"
       role="dialog"
       aria-modal="true"
+      aria-labelledby="version-control-modal-title"
+      aria-describedby="version-control-modal-description"
     >
       {/* Modal container with focus management */}
       <div
@@ -115,18 +118,20 @@ const VersionControlModal: FC<VersionControlModalProps> = ({
       >
         {/* Modal header */}
         <div className="flex justify-between items-center border-b border-mocha p-4">
-          <h2 className="text-xl font-bold">Version History</h2>
+          <h2 id="version-control-modal-title" className="text-xl font-bold">
+            Version History
+          </h2>
           <button
             onClick={onClose}
             className="text-mocha-dark hover:text-mocha transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-mocha"
-            aria-label="Close Modal"
+            aria-label="Close Version History Modal"
           >
             &times;
           </button>
         </div>
 
         {/* Modal content */}
-        <div className="p-4 max-h-96 overflow-y-auto">
+        <div id="version-control-modal-description" className="p-4 max-h-96 overflow-y-auto">
           {versions.length === 0 ? (
             <p className="text-mocha">No versions available.</p>
           ) : (
@@ -153,6 +158,7 @@ const VersionControlModal: FC<VersionControlModalProps> = ({
                       <button
                         onClick={() => onRollbackVersion(version.id)}
                         className="bg-mocha text-white px-2 py-1 rounded hover:bg-mocha-dark transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-mocha"
+                        aria-label={`Rollback to version ${version.versionNumber}`}
                       >
                         Rollback
                       </button>
@@ -169,12 +175,14 @@ const VersionControlModal: FC<VersionControlModalProps> = ({
           <button
             onClick={onRollbackOriginal}
             className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-red-300"
+            aria-label="Rollback to Original Text"
           >
             Rollback to Original
           </button>
           <button
             onClick={onClose}
             className="bg-mocha-dark text-white px-4 py-2 rounded hover:bg-mocha transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-mocha"
+            aria-label="Close Modal"
           >
             Close
           </button>
