@@ -2,106 +2,97 @@
  * @file components/FileItem.tsx
  * @description
  * This component represents an individual file item in the file list.
- * It displays file information (such as name, type, and proofreading status) and provides
- * action buttons for renaming, deleting, initiating the proofreading process, and viewing version history.
+ * It displays file information (name, type, and proofreading status) and provides
+ * action buttons for renaming, deleting, initiating proofreading, and viewing version history.
  *
  * Key features:
- * - Toggle between display and edit mode for renaming.
- * - Immediate triggers for file deletion, proofreading, and version history.
+ * - Toggle between display and edit mode for renaming with input auto-saving.
+ * - Smooth hover effects and transition animations using the mocha color palette.
+ * - Clear action buttons for all file operations.
  *
  * @dependencies
  * - React: For component creation and state management.
+ * - FileData type from FileList for proper TypeScript type validation.
  *
  * @notes
- * - Uses local state to manage the renaming process.
- * - Validates input to ensure that the new name is not empty or unchanged.
+ * - Ensures a modern, minimalist design while incorporating accessibility improvements.
+ * - Uses Tailwind CSS classes for styling and transitions.
  */
 
 import React, { useState } from 'react';
 import { FileData } from './FileList';
 
-// Define the props for the FileItem component.
 interface FileItemProps {
   file: FileData;
   onRename: (fileId: string, newName: string) => void;
   onDelete: (fileId: string) => void;
   onProofread: (fileId: string) => void;
-  onViewVersions: (fileId: string) => void; // New callback for version history
+  onViewVersions: (fileId: string) => void;
 }
 
-/**
- * FileItem Component
- * @param file - The file data object.
- * @param onRename - Callback function to rename the file.
- * @param onDelete - Callback function to delete the file.
- * @param onProofread - Callback function to initiate proofreading.
- * @param onViewVersions - Callback function to view version history.
- */
 const FileItem: React.FC<FileItemProps> = ({ file, onRename, onDelete, onProofread, onViewVersions }) => {
-  // Local state to manage whether the file name is in edit mode.
+  // Local state to manage editing mode for renaming.
   const [isEditing, setIsEditing] = useState<boolean>(false);
   // Local state to hold the new file name during renaming.
   const [newName, setNewName] = useState<string>(file.file_name);
 
   /**
    * Handles the rename action.
-   * Validates the new name and calls the onRename callback.
+   * Validates that the new name is non-empty and has changed, then calls the onRename callback.
    */
   const handleRename = () => {
-    // Only trigger rename if the new name is different and not empty.
     if (newName.trim() && newName !== file.file_name) {
       onRename(file.file_id, newName);
     }
-    // Exit editing mode.
     setIsEditing(false);
   };
 
   return (
-    <div className="flex items-center justify-between bg-white p-4 rounded shadow-sm">
+    <div className="flex items-center justify-between bg-white p-4 rounded shadow-sm hover:shadow-lg transition-shadow duration-300">
       <div className="flex flex-col">
         {isEditing ? (
-          // Input field for renaming; auto-saves on blur.
+          // Input field for renaming with auto-save on blur.
           <input
             type="text"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             onBlur={handleRename}
-            className="border rounded px-2 py-1"
+            className="border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-mocha-light"
             autoFocus
           />
         ) : (
           // Display the file name when not editing.
-          <span className="font-semibold">{file.file_name}</span>
+          <span className="font-semibold text-mocha-dark">{file.file_name}</span>
         )}
         <span className="text-sm text-gray-500">{file.file_type.toUpperCase()}</span>
         <span className="text-xs text-gray-400">Status: {file.proofreading_status}</span>
       </div>
       <div className="flex space-x-2">
-        {/* Button to toggle renaming mode */}
+        {/* Rename Button */}
         <button
           onClick={() => setIsEditing(true)}
-          className="bg-yellow-500 text-white px-2 py-1 rounded hover:bg-yellow-600 transition-colors"
+          className="bg-mocha text-white px-2 py-1 rounded hover:bg-mocha-light transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-mocha-light"
         >
           Rename
         </button>
-        {/* Button to delete the file */}
+        {/* Delete Button */}
         <button
           onClick={() => onDelete(file.file_id)}
-          className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600 transition-colors"
+          className="bg-mocha-dark text-white px-2 py-1 rounded hover:bg-mocha transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-mocha-light"
         >
           Delete
         </button>
-        {/* Button to start the proofreading process */}
+        {/* Proofread Button */}
         <button
           onClick={() => onProofread(file.file_id)}
-          className="bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600 transition-colors"
+          className="bg-mocha text-white px-2 py-1 rounded hover:bg-mocha-light transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-mocha-light"
         >
           Proofread
         </button>
-        {/* Button to view version history */}
+        {/* Version History Button */}
         <button
           onClick={() => onViewVersions(file.file_id)}
-          className="bg-purple-500 text-white px-2 py-1 rounded hover:bg-purple-600 transition-colors"
+          className="bg-mocha-light text-white px-2 py-1 rounded hover:bg-mocha transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-mocha-light"
         >
           Version History
         </button>
