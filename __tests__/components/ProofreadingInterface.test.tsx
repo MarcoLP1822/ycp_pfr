@@ -1,22 +1,17 @@
 /**
  * @file __tests__/components/ProofreadingInterface.test.tsx
  * @description
- * This test file contains unit tests for the ProofreadingInterface component.
- * It verifies that the component renders the original text and the corrected text with inline highlights,
- * and checks that the onAcceptIndividual callback is triggered when a <mark> element is clicked.
- *
+ * This file contains tests for the ProofreadingInterface component.
+ * It verifies that the original and corrected texts are rendered correctly,
+ * and that user interactions like clicking inline corrections and the "Accept All Corrections" button work as expected.
+ * 
  * Key features:
- * - Renders the component with dummy text values.
- * - Simulates click events on highlighted corrections.
- * - Verifies that the onAcceptIndividual callback receives the correct correction identifier.
- *
+ * - Checks rendering of original text and highlighted corrections.
+ * - Simulates clicking on inline corrections to trigger the onAcceptIndividual callback.
+ * - Verifies that the "Accept All Corrections" button is rendered and triggers onAcceptAll when clicked.
+ * 
  * @dependencies
- * - React Testing Library: Used for rendering components and simulating user events.
- * - Jest: Used for making assertions.
- *
- * @notes
- * - This test ensures that the ProofreadingInterface component meets its UI and interaction specifications.
- * - Additional tests can be added to cover more edge cases as needed.
+ * - React Testing Library for rendering components and simulating user events.
  */
 
 import React from 'react';
@@ -61,5 +56,24 @@ describe('ProofreadingInterface Component', () => {
     
     // The callback should be called with the correction identifier 'correction-1'
     expect(onAcceptIndividualMock).toHaveBeenCalledWith('correction-1');
+  });
+
+  test('renders Accept All Corrections button and calls onAcceptAll when clicked', () => {
+    const onAcceptAllMock = jest.fn();
+    render(
+      <ProofreadingInterface
+        originalText={dummyOriginalText}
+        correctedText={dummyCorrectedText}
+        onAcceptAll={onAcceptAllMock}
+      />
+    );
+    
+    // Verify that the "Accept All Corrections" button is rendered.
+    const button = screen.getByRole('button', { name: /accept all corrections/i });
+    expect(button).toBeInTheDocument();
+    
+    // Simulate a click on the button and ensure the callback is invoked.
+    fireEvent.click(button);
+    expect(onAcceptAllMock).toHaveBeenCalled();
   });
 });

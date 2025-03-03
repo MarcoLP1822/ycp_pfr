@@ -1,23 +1,16 @@
 /**
  * @file __tests__/components/FileUpload.test.tsx
  * @description
- * This file contains an example unit test for the FileUpload component.
- * It renders the component and verifies that the upload UI (e.g., the heading text)
- * is rendered correctly.
+ * This file contains tests for the FileUpload component.
+ * In addition to verifying that the upload heading is rendered,
+ * an extra test has been added to check for the correct aria-label on the file input.
  * 
  * Key features:
- * - Uses React Testing Library to render the component.
- * - Asserts that the component displays the expected text.
+ * - Confirms that the heading "Upload Document" appears.
+ * - Verifies the file input's accessibility attribute.
  * 
  * @dependencies
- * - React: For JSX and component rendering.
- * - @testing-library/react: To render and query the component.
- * - @testing-library/jest-dom: To use extended matchers like toBeInTheDocument().
- * - FileUpload component: The component under test.
- * 
- * @notes
- * - This is a basic test example. Additional tests should be written for edge cases,
- *   event handling, and integration with Supabase functions.
+ * - React Testing Library for rendering and querying elements.
  */
 
 import * as React from 'react';
@@ -30,5 +23,12 @@ describe('FileUpload Component', () => {
     // Verify that the heading "Upload Document" is present in the document.
     const headingElement = screen.getByText(/upload document/i);
     expect(headingElement).toBeInTheDocument();
+  });
+
+  test('renders file upload input with correct aria-label', () => {
+    render(<FileUpload />);
+    // Check that the file input element is accessible by its aria-label.
+    const inputElement = screen.getByLabelText('File Upload Input');
+    expect(inputElement).toBeInTheDocument();
   });
 });
