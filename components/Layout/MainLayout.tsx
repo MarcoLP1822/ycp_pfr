@@ -1,53 +1,72 @@
 /**
  * @file components/Layout/MainLayout.tsx
  * @description
- * This component provides the overall layout structure for the application.
- * It includes a header at the top, a sidebar for navigation, and a main content area
- * that has been refined to ensure consistency with the updated Header and Sidebar styles.
- * The layout now uses increased padding to provide ample white space and adheres to a
- * modern, minimalist design aesthetic.
+ * This component provides the main layout for all authenticated pages. It uses a
+ * Material UI AppBar at the top (optional) and a permanent Drawer (Sidebar) on the left.
+ * Content is rendered to the right of the Drawer.
  *
  * Key features:
- * - Incorporates a top header with updated branding and authentication controls.
- * - Provides a responsive sidebar that aligns with the mocha color palette.
- * - Uses a centered container with increased padding for the main content.
+ * - Material UI Drawer (via the Sidebar component) for fixed navigation
+ * - Optional Material UI AppBar at the top
+ * - Main content area that sits to the right of the Drawer
  *
  * @dependencies
- * - React: For component creation.
- * - Header: Displays the top navigation bar.
- * - Sidebar: Provides navigation links on the side.
+ * - React: For component creation
+ * - Material UI: AppBar, Toolbar, Box, etc. for the layout
+ * - Sidebar: The Drawer-based navigation component
  *
  * @notes
- * - This layout is intended as a wrapper for pages requiring the full application layout.
- * - Adjustments have been made to padding and background colors to enhance the minimalist design.
+ * - The drawerWidth must match the width used in the Sidebar component
+ * - Customize the AppBar as needed (title, user info, etc.)
+ * - Wrap pages in <MainLayout> to display the sidebar
  */
 
 import React from 'react';
-import Header, { HeaderProps } from './Header';
+import { AppBar, Box, CssBaseline, Toolbar, Typography } from '@mui/material';
 import Sidebar from './Sidebar';
 
-export interface MainLayoutProps extends HeaderProps {
+const drawerWidth = 240;
+
+interface MainLayoutProps {
   children: React.ReactNode;
 }
 
-const MainLayout: React.FC<MainLayoutProps> = ({ children, user, onLogout }) => {
+const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col">
-      {/* Top Header */}
-      <Header user={user} onLogout={onLogout} />
-      {/* Main layout container with sidebar and content */}
-      <div className="flex flex-1">
-        {/* Sidebar for navigation */}
-        <Sidebar />
-        {/* Main content area with increased padding for ample white space */}
-        <main className="flex-1 p-10 bg-white">
-          {/* Centered container for consistent content width */}
-          <div className="max-w-7xl mx-auto">
-            {children}
-          </div>
-        </main>
-      </div>
-    </div>
+    <Box sx={{ display: 'flex' }}>
+      <CssBaseline />
+
+      {/* Optional top AppBar. Remove or customize as needed. */}
+      <AppBar
+        position="fixed"
+        sx={{
+          zIndex: (theme) => theme.zIndex.drawer + 1,
+        }}
+      >
+        <Toolbar>
+          <Typography variant="h6" noWrap component="div">
+            Proofreading App
+          </Typography>
+        </Toolbar>
+      </AppBar>
+
+      {/* Permanent Sidebar (Drawer) */}
+      <Sidebar />
+
+      {/* Main content area to the right of the drawer */}
+      <Box
+        component="main"
+        sx={{
+          flexGrow: 1,
+          p: 3,
+          width: { sm: `calc(100% - ${drawerWidth}px)` },
+        }}
+      >
+        {/* Add a toolbar spacer so content is below the AppBar */}
+        <Toolbar />
+        {children}
+      </Box>
+    </Box>
   );
 };
 

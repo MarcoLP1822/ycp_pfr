@@ -1,70 +1,61 @@
 /**
  * @file components/Layout/Sidebar.tsx
  * @description
- * This component renders a collapsible sidebar for the application.
- * It provides a navigation menu that is responsive and uses the mocha color palette,
- * aligning with a modern, sleek, and minimalist design.
- * Accessibility enhancements include explicit aria-labels for navigation.
+ * This component renders a Material UI permanent Drawer (fixed sidebar) for navigation.
+ * Since you don't have a standalone /proofreading page (you only have /proofreading/[fileId]),
+ * we'll remove the direct link to /proofreading.
  *
  * Key features:
- * - Collapsible menu on mobile devices with smooth transitions.
- * - Responsive design using Tailwind CSS breakpoints.
- * - Uses mocha-light for the sidebar background and mocha-dark for text.
- * - Hover effects for navigation links with transition animations.
+ * - Uses Material UI's permanent Drawer for a fixed sidebar
+ * - Displays an application title at the top
+ * - Provides a link to /dashboard only
  *
  * @dependencies
- * - React: For state management and rendering.
- * - Next.js Link: For client-side navigation.
+ * - React
+ * - Material UI: Drawer, Toolbar, List, ListItemButton, ListItemText, Typography
+ * - Next.js Link
  *
  * @notes
- * - The toggle button is only visible on mobile (using md:hidden).
- * - The sidebar is fixed on mobile to overlay content and relative on desktop.
+ * - If you decide to create an index page at /proofreading, you can add the link back
+ *   or rename it. For now, it's removed to avoid a 404 route.
  */
 
-import React, { useState } from 'react';
+import React from 'react';
 import Link from 'next/link';
+import { Drawer, Toolbar, List, ListItemButton, ListItemText, Typography } from '@mui/material';
+
+const drawerWidth = 240;
 
 const Sidebar: React.FC = () => {
-  // State to track whether the sidebar is collapsed on mobile devices
-  const [isCollapsed, setIsCollapsed] = useState(true);
-
   return (
-    <div>
-      {/* Toggle button for mobile devices */}
-      <button
-        className="md:hidden p-2 bg-mocha text-white rounded focus:outline-none focus:ring-2 focus:ring-mocha-light"
-        onClick={() => setIsCollapsed(!isCollapsed)}
-        aria-label="Toggle Navigation Menu"
-      >
-        {/* Simple hamburger icon using SVG */}
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-        </svg>
-      </button>
-
-      {/* Sidebar navigation panel */}
-      <aside
-        className={`bg-mocha-light text-mocha-dark w-64 min-h-screen p-4 transition-transform transform 
-                    ${isCollapsed ? '-translate-x-full' : 'translate-x-0'} 
-                    md:translate-x-0 md:block fixed md:relative z-50`}
-      >
-        <nav className="space-y-4" aria-label="Sidebar Navigation">
-          <Link
-            href="/dashboard"
-            className="block px-2 py-1 hover:bg-mocha hover:text-white rounded transition-colors"
-          >
-            Dashboard
-          </Link>
-          <Link
-            href="/proofreading"
-            className="block px-2 py-1 hover:bg-mocha hover:text-white rounded transition-colors"
-          >
-            Proofreading
-          </Link>
-          {/* Future navigation links can be added here */}
-        </nav>
-      </aside>
-    </div>
+    <Drawer
+      variant="permanent"
+      sx={{
+        width: drawerWidth,
+        flexShrink: 0,
+        '& .MuiDrawer-paper': {
+          width: drawerWidth,
+          boxSizing: 'border-box',
+        },
+      }}
+    >
+      <Toolbar>
+        <Typography variant="h6" noWrap>
+          Proofreading App
+        </Typography>
+      </Toolbar>
+      <List>
+        <Link href="/dashboard">
+          <ListItemButton>
+            <ListItemText primary="Dashboard" />
+          </ListItemButton>
+        </Link>
+        {/* 
+          Removed the /proofreading link because no standalone page at /proofreading exists.
+          If you later create pages/proofreading/index.tsx, you can add a link here.
+        */}
+      </List>
+    </Drawer>
   );
 };
 

@@ -1,48 +1,56 @@
 /**
  * @file components/FileUpload.tsx
  * @description
- * This component handles uploading files to Supabase Storage and creates a corresponding record in the
- * `files` table by calling the `/api/files/upload` endpoint.
- * 
- * Enhancements in this update:
- * - Added responsive padding classes for better layout on different screen sizes.
- * - Incorporated micro-interaction effects (scale transitions) on the container and upload button.
- * - Maintained clear calls-to-action and error/success messaging with smooth transitions.
- *
- * Key features:
- * - Validates file extension before uploading (doc, docx, odt, odf, txt).
- * - Uses the mocha color palette for a modern, sleek, and minimalist UI.
- * - Provides clear calls-to-action and smooth transition effects on buttons and inputs.
- * - Displays error and success messages styled with mocha colors.
+ * Handles uploading files. After a successful upload, it calls `onFileUploaded(newFile)`,
+ * letting the parent know about the new file so it can be displayed immediately.
  *
  * @dependencies
- * - React: For component creation.
- * - @supabase/auth-helpers-react: For session and supabase client.
- * - Tailwind CSS: For styling and responsive design.
+ * - React
+ * - Material UI
+ * - @supabase/auth-helpers-react
  *
  * @notes
- * - Ensure that your Tailwind configuration includes the mocha color palette.
- * - Verify file validation messages and upload button responsiveness on various devices.
+ * - Ensure the /api/files/upload endpoint returns the newly inserted file object
+ *   so we can pass it to the parent.
  */
 
 import React, { useState, ChangeEvent } from 'react';
 import { useSupabaseClient, useSession } from '@supabase/auth-helpers-react';
+import {
+  Card,
+  CardContent,
+  Typography,
+  Button,
+  Box,
+  Alert,
+} from '@mui/material';
+
+// This interface must match your FileData structure from FileList
+interface FileData {
+  file_id: string;
+  file_name: string;
+  file_type: string;
+  upload_timestamp: string;
+  proofreading_status: string;
+  version_number: number;
+  file_url: string;
+}
+
+interface FileUploadProps {
+  onFileUploaded?: (newFile: FileData) => void;
+}
 
 const allowedExtensions = ['doc', 'docx', 'odt', 'odf', 'txt'];
 
-const FileUpload: React.FC = () => {
+const FileUpload: React.FC<FileUploadProps> = ({ onFileUploaded }) => {
   const supabase = useSupabaseClient();
   const session = useSession();
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string>('');
-  const [uploading, setUploading] = useState<boolean>(false);
-  const [uploadSuccess, setUploadSuccess] = useState<string>('');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [uploadSuccess, setUploadSuccess] = useState('');
+  const [uploading, setUploading] = useState(false);
 
-  /**
-   * Handles file selection and validates the file extension.
-   * @param e - The file input change event.
-   */
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     setErrorMessage('');
     setUploadSuccess('');
@@ -50,7 +58,9 @@ const FileUpload: React.FC = () => {
       const file = e.target.files[0];
       const fileExtension = file.name.split('.').pop()?.toLowerCase();
       if (!fileExtension || !allowedExtensions.includes(fileExtension)) {
-        setErrorMessage('Invalid file type. Please upload a doc, docx, odt/odf, or txt file.');
+        setErrorMessage(
+          'Invalid file type. Please upload a doc, docx, odt/odf, or txt file.'
+        );
         setSelectedFile(null);
         return;
       }
@@ -58,10 +68,6 @@ const FileUpload: React.FC = () => {
     }
   };
 
-  /**
-   * Uploads the selected file to Supabase Storage, then calls `/api/files/upload`
-   * to insert a row in the `files` table.
-   */
   const handleUpload = async () => {
     if (!selectedFile) {
       setErrorMessage('Please select a file before uploading.');
@@ -80,6 +86,7 @@ const FileUpload: React.FC = () => {
       const fileName = `${Date.now()}-${selectedFile.name}`;
       const bucketName = 'uploads';
 
+      // 1) Upload the file to Supabase storage
       const { data, error: uploadError } = await supabase.storage
         .from(bucketName)
         .upload(fileName, selectedFile);
@@ -91,9 +98,12 @@ const FileUpload: React.FC = () => {
         return;
       }
 
-      const fileExtension = (selectedFile.name.split('.').pop() || '').toLowerCase();
+      const fileExtension = (
+        selectedFile.name.split('.').pop() || ''
+      ).toLowerCase();
       const fileUrl = data?.path || fileName;
 
+      // 2) Insert a row in the `files` table
       const bodyData = {
         user_id: session.user.id,
         file_name: selectedFile.name,
@@ -110,50 +120,79 @@ const FileUpload: React.FC = () => {
       if (!response.ok) {
         const errorBody = await response.json();
         console.error('Error inserting file metadata:', errorBody);
-        setErrorMessage(`Database insertion failed: ${errorBody.error || 'Unknown error'}`);
+        setErrorMessage(
+          `Database insertion failed: ${errorBody.error || 'Unknown error'}`
+        );
         setUploading(false);
         return;
       }
 
+      // 3) Parse the newly inserted file object from the response
+      const newFile: FileData = await response.json();
       setUploadSuccess('File uploaded and database updated successfully.');
       setSelectedFile(null);
-    } catch (uploadError: any) {
-      console.error('Unexpected upload error:', uploadError);
-      setErrorMessage(`An unexpected error occurred: ${uploadError.message}`);
+
+      // 4) Notify the parent so the new file can appear immediately in the list
+      if (onFileUploaded) {
+        onFileUploaded(newFile);
+      }
+    } catch (err: any) {
+      console.error('Unexpected upload error:', err);
+      setErrorMessage(`An unexpected error occurred: ${err.message}`);
     } finally {
       setUploading(false);
     }
   };
 
   return (
-    <div className="p-4 sm:p-6 border border-mocha rounded shadow-sm bg-white transition-transform duration-200 hover:scale-105">
-      <h2 className="text-2xl font-semibold mb-4 text-mocha-dark">Upload Document</h2>
-      {errorMessage && (
-        <p role="alert" className="text-mocha-dark mb-2 bg-mocha-light p-2 rounded">
-          {errorMessage}
-        </p>
-      )}
-      {uploadSuccess && (
-        <p role="status" className="text-mocha mb-2 bg-mocha-light p-2 rounded">
-          {uploadSuccess}
-        </p>
-      )}
-      <input
-        type="file"
-        accept=".doc,.docx,.odt,.odf,.txt"
-        onChange={handleFileChange}
-        className="mb-4 w-full border border-mocha rounded p-2 focus:outline-none focus:ring-2 focus:ring-mocha-light transition-colors duration-300"
-        aria-label="File Upload Input"
-      />
-      <button
-        onClick={handleUpload}
-        disabled={uploading}
-        className="w-full bg-mocha text-white py-3 px-4 rounded transition-transform transform active:scale-95 hover:scale-105 duration-200 focus:outline-none focus:ring-2 focus:ring-mocha-light"
-        aria-label="Upload file"
-      >
-        {uploading ? 'Uploading...' : 'Upload'}
-      </button>
-    </div>
+    <Card variant="outlined" sx={{ mb: 2 }}>
+      <CardContent>
+        <Typography variant="h6" gutterBottom>
+          Upload Document
+        </Typography>
+
+        {errorMessage && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {errorMessage}
+          </Alert>
+        )}
+        {uploadSuccess && (
+          <Alert severity="success" sx={{ mb: 2 }}>
+            {uploadSuccess}
+          </Alert>
+        )}
+
+        <Box display="flex" alignItems="center" gap={2}>
+          {/* Hidden file input */}
+          <input
+            type="file"
+            accept=".doc,.docx,.odt,.odf,.txt"
+            onChange={handleFileChange}
+            style={{ display: 'none' }}
+            id="file-input"
+          />
+          <label htmlFor="file-input">
+            <Button variant="contained" component="span">
+              Choose File
+            </Button>
+          </label>
+
+          <Typography variant="body2">
+            {selectedFile ? selectedFile.name : 'No file selected'}
+          </Typography>
+        </Box>
+
+        <Button
+          onClick={handleUpload}
+          disabled={uploading}
+          variant="contained"
+          color="primary"
+          sx={{ mt: 2 }}
+        >
+          {uploading ? 'Uploading...' : 'Upload'}
+        </Button>
+      </CardContent>
+    </Card>
   );
 };
 

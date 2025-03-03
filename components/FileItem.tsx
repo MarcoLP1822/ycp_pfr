@@ -1,27 +1,39 @@
 /**
  * @file components/FileItem.tsx
  * @description
- * This component represents an individual file item in the file list.
- * It displays file information and provides action buttons for renaming, deleting, initiating proofreading,
- * and viewing version history.
- * 
- * Enhancements in this update:
- * - Updated container classes to ensure responsiveness (switching between column and row layouts).
- * - Added micro-interaction effects (scale transitions) to the container and buttons.
+ * Represents an individual file item in the list using Material UI. 
+ * Now pressing Enter in the rename text field will confirm the rename.
  *
  * Key features:
- * - Toggle between display and edit mode for renaming with input auto-saving.
- * - Smooth hover effects and transition animations using the mocha color palette.
- * - Clear action buttons for all file operations.
+ * - Uses MUI Card, CardContent, CardActions for layout
+ * - Inline rename with a TextField
+ * - Press Enter to confirm rename
+ * - Delete confirmation dialog
+ * - Proofread and Version History buttons
  *
  * @dependencies
- * - React: For component creation and state management.
+ * - React: For state management
+ * - Material UI: Card, CardContent, CardActions, Button, Typography, TextField, Dialog, etc.
+ * - onDelete callback triggers the actual file deletion in the parent
  *
  * @notes
- * - Ensures a modern, minimalist design while incorporating accessibility improvements.
+ * - We detect Enter in the text field with onKeyDown. If e.key === 'Enter', we call handleRename().
  */
 
 import React, { useState } from 'react';
+import {
+  Card,
+  CardContent,
+  CardActions,
+  Button,
+  Typography,
+  TextField,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+} from '@mui/material';
 import { FileData } from './FileList';
 
 interface FileItemProps {
@@ -32,12 +44,22 @@ interface FileItemProps {
   onViewVersions: (fileId: string) => void;
 }
 
-const FileItem: React.FC<FileItemProps> = ({ file, onRename, onDelete, onProofread, onViewVersions }) => {
-  const [isEditing, setIsEditing] = useState<boolean>(false);
-  const [newName, setNewName] = useState<string>(file.file_name);
+const FileItem: React.FC<FileItemProps> = ({
+  file,
+  onRename,
+  onDelete,
+  onProofread,
+  onViewVersions,
+}) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [newName, setNewName] = useState(file.file_name);
+
+  // State to control the delete confirmation dialog
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   /**
-   * Handles the rename action.
+   * Handles the rename action when user finishes editing.
+   * If there's a valid, changed name, calls onRename callback.
    */
   const handleRename = () => {
     if (newName.trim() && newName !== file.file_name) {
@@ -46,56 +68,111 @@ const FileItem: React.FC<FileItemProps> = ({ file, onRename, onDelete, onProofre
     setIsEditing(false);
   };
 
+  // Called when the user clicks the "Delete" button
+  const handleDeleteClick = () => {
+    setConfirmDeleteOpen(true);
+  };
+
+  // Called when the user confirms deletion in the dialog
+  const handleConfirmDelete = () => {
+    onDelete(file.file_id);
+    setConfirmDeleteOpen(false);
+  };
+
+  // Called when the user cancels deletion in the dialog
+  const handleCancelDelete = () => {
+    setConfirmDeleteOpen(false);
+  };
+
   return (
-    <div className="flex flex-col md:flex-row items-center justify-between bg-white p-4 md:p-6 rounded shadow-sm hover:shadow-lg transition-all duration-300 transform hover:scale-105">
-      <div className="flex flex-col">
-        {isEditing ? (
-          <input
-            type="text"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            onBlur={handleRename}
-            className="border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-mocha-light"
-            autoFocus
-            aria-label="File name input"
-          />
-        ) : (
-          <span className="font-semibold text-mocha-dark">{file.file_name}</span>
-        )}
-        <span className="text-sm text-gray-500">{file.file_type.toUpperCase()}</span>
-        <span className="text-xs text-gray-400">Status: {file.proofreading_status}</span>
-      </div>
-      <div className="flex space-x-2 mt-2 md:mt-0">
-        <button
-          onClick={() => setIsEditing(true)}
-          className="bg-mocha text-white px-2 py-1 rounded hover:bg-mocha-light transition-transform duration-200 active:scale-95 focus:outline-none focus:ring-2 focus:ring-mocha-light"
-          aria-label={`Rename file ${file.file_name}`}
-        >
-          Rename
-        </button>
-        <button
-          onClick={() => onDelete(file.file_id)}
-          className="bg-mocha-dark text-white px-2 py-1 rounded hover:bg-mocha transition-transform duration-200 active:scale-95 focus:outline-none focus:ring-2 focus:ring-mocha-light"
-          aria-label={`Delete file ${file.file_name}`}
-        >
-          Delete
-        </button>
-        <button
-          onClick={() => onProofread(file.file_id)}
-          className="bg-mocha text-white px-2 py-1 rounded hover:bg-mocha-light transition-transform duration-200 active:scale-95 focus:outline-none focus:ring-2 focus:ring-mocha-light"
-          aria-label={`Proofread file ${file.file_name}`}
-        >
-          Proofread
-        </button>
-        <button
-          onClick={() => onViewVersions(file.file_id)}
-          className="bg-mocha-light text-white px-2 py-1 rounded hover:bg-mocha transition-transform duration-200 active:scale-95 focus:outline-none focus:ring-2 focus:ring-mocha-light"
-          aria-label={`View version history for file ${file.file_name}`}
-        >
-          Version History
-        </button>
-      </div>
-    </div>
+    <>
+      <Card variant="outlined" sx={{ mb: 2 }}>
+        <CardContent>
+          {isEditing ? (
+            <TextField
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              onBlur={handleRename}
+              autoFocus
+              size="small"
+              label="File name"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault(); // prevent form submission or any default
+                  handleRename();
+                }
+              }}
+            />
+          ) : (
+            <Typography variant="subtitle1" fontWeight="bold">
+              {file.file_name}
+            </Typography>
+          )}
+          <Typography variant="body2" color="text.secondary">
+            {file.file_type.toUpperCase()}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Status: {file.proofreading_status}
+          </Typography>
+        </CardContent>
+        <CardActions>
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={() => setIsEditing(true)}
+          >
+            RINOMINA
+          </Button>
+          <Button
+            size="small"
+            variant="outlined"
+            color="error"
+            onClick={handleDeleteClick}
+          >
+            ELIMINA
+          </Button>
+          <Button
+            size="small"
+            variant="contained"
+            onClick={() => onProofread(file.file_id)}
+          >
+            PROOFREAD
+          </Button>
+          <Button
+            size="small"
+            variant="contained"
+            color="secondary"
+            onClick={() => onViewVersions(file.file_id)}
+          >
+            VERSION HISTORY
+          </Button>
+        </CardActions>
+      </Card>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={confirmDeleteOpen}
+        onClose={handleCancelDelete}
+        aria-labelledby="confirm-delete-dialog-title"
+        aria-describedby="confirm-delete-dialog-description"
+      >
+        <DialogTitle id="confirm-delete-dialog-title">
+          Conferma eliminazione
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText id="confirm-delete-dialog-description">
+            Sei sicuro di voler eliminare <strong>{file.file_name}</strong>?
+            Questa azione è irreversibile.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCancelDelete}>Annulla</Button>
+          <Button onClick={handleConfirmDelete} autoFocus color="error" variant="contained">
+            Elimina
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
   );
 };
 

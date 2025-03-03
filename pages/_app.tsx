@@ -1,65 +1,69 @@
 /**
  * @file pages/_app.tsx
  * @description
- * This file is the custom App component in Next.js. It wraps all pages in a global layout,
- * ensuring the sidebar and header appear on every page. It also provides the Supabase session context
- * so that user authentication and session data can be accessed throughout the app.
+ * This file is the custom App component for Next.js. We integrate:
+ * - Supabase authentication context
+ * - Material UI ThemeProvider for Material Design
+ * - Global CSS
+ * - Conditional layout usage (if the path is '/' or '/register', skip layout)
  *
  * Key features:
- * - Wraps all pages in <MainLayout>, adding the header and sidebar globally.
- * - Manages user session with Supabase Auth Helpers.
- * - Provides a global logout handler that signs the user out and redirects to the home page.
+ * - Wraps the entire application in SessionContextProvider for Supabase
+ * - Wraps the entire application in ThemeProvider for Material UI theming
+ * - Applies Material UI baseline styles via <CssBaseline />
+ * - Conditionally wraps pages in <MainLayout> except for login or registration
  *
  * @dependencies
- * - Next.js: For the custom App component and router.
- * - Supabase Auth Helpers: For session handling.
- * - MainLayout: For displaying the global header and sidebar.
- * - React: For hooks and state management.
+ * - @supabase/auth-helpers-nextjs: For creating the Supabase client
+ * - @supabase/auth-helpers-react: For the SessionContextProvider
+ * - @mui/material/styles: For the ThemeProvider
+ * - @mui/material/CssBaseline: For resetting default browser styles
+ * - React & Next.js: For the application framework
  *
  * @notes
- * - If you have pages that should NOT display the sidebar, you'll need to conditionally render
- *   <MainLayout> based on the current route. Currently, we display the sidebar on all pages.
- * - The environment variables for Supabase are taken from your .env.* files or hosting environment.
+ * - Make sure you have installed @mui/material, @emotion/react, and @emotion/styled
+ * - Adjust the conditional logic if you have other routes that should skip the sidebar
  */
 
 import { useState } from 'react';
 import { useRouter } from 'next/router';
-import type { AppProps } from 'next/app';
 import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
-import { SessionContextProvider, useSession } from '@supabase/auth-helpers-react';
+import { SessionContextProvider } from '@supabase/auth-helpers-react';
+import type { AppProps } from 'next/app';
 import type { Session } from '@supabase/auth-helpers-react';
 
+import { ThemeProvider } from '@mui/material/styles';
+import CssBaseline from '@mui/material/CssBaseline';
+
+import '../styles/global.css'; // Tailwind/global CSS if you still want it
+import theme from '../styles/theme'; // Custom Material UI theme
 import MainLayout from '../components/Layout/MainLayout';
-import '../styles/global.css';
 
 function MyApp({ Component, pageProps }: AppProps<{ initialSession: Session }>) {
-  // Create the Supabase client once per app load
+  // Create the Supabase client once
   const [supabaseClient] = useState(() => createPagesBrowserClient());
 
-  // Access the current user session
-  const session = useSession();
   const router = useRouter();
+  const noLayoutNeeded = ['/', '/register']; // Add routes here that should NOT have the sidebar
 
-  /**
-   * Logs the user out via Supabase and redirects to the home page.
-   */
-  const handleLogout = async () => {
-    await supabaseClient.auth.signOut();
-    router.push('/');
-  };
+  // If the current route is in noLayoutNeeded, skip the MainLayout
+  const isNoLayoutRoute = noLayoutNeeded.includes(router.pathname);
 
   return (
     <SessionContextProvider
       supabaseClient={supabaseClient}
       initialSession={pageProps.initialSession}
     >
-      {/* 
-        Wrap every page in the MainLayout so the sidebar and header
-        are shown on every route. We pass user + onLogout to the header.
-      */}
-      <MainLayout user={session?.user} onLogout={handleLogout}>
-        <Component {...pageProps} />
-      </MainLayout>
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        {isNoLayoutRoute ? (
+          <Component {...pageProps} />
+        ) : (
+          <MainLayout>
+            <Component {...pageProps} />
+          </MainLayout>
+        )}
+      </ThemeProvider>
     </SessionContextProvider>
   );
 }

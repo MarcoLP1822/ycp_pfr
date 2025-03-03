@@ -2,60 +2,32 @@
  * @file pages/dashboard.tsx
  * @description
  * Dashboard page that integrates file upload, file listing, and version control.
- * Users can trigger renaming, deletion, proofreading, and view version history.
- * When viewing version history, the modal provides two rollback options.
+ * Uses Material UI for a consistent design. 
  *
- * Enhancements:
- * - Wrapped the entire dashboard in MainLayout to display the header and sidebar.
- * - Passes user and onLogout to MainLayout for authentication controls in the header.
- *
- * Key features:
- * - File management (upload, rename, delete).
- * - Proofreading triggers that redirect to the dynamic proofreading interface.
- * - Version history modal with rollback functionality.
- *
- * @dependencies
- * - React for state management.
- * - Next.js router for navigation.
- * - FileUpload, FileList, and VersionControlModal components for UI.
- * - MainLayout for the header + sidebar layout.
- * - useSession and useSupabaseClient for user/session info and logout.
- *
- * @notes
- * - The rollback functions call the /api/files/rollback endpoint.
- * - The user must be logged in to access this page (enforced by middleware).
+ * Key changes:
+ * - Added `handleFileUploaded` to update `files` state when a file is successfully uploaded.
+ * - Pass `onFileUploaded` to <FileUpload> so new files appear without a page refresh.
  */
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { useSession, useSupabaseClient } from '@supabase/auth-helpers-react';
-
-import MainLayout from '../components/Layout/MainLayout';
+import {
+  Container,
+  Typography,
+  Box,
+} from '@mui/material';
 import FileUpload from '../components/FileUpload';
 import FileList, { FileData } from '../components/FileList';
 import VersionControlModal, { Version } from '../components/VersionControlModal';
 
 const Dashboard: React.FC = () => {
-  const router = useRouter();
-  const session = useSession();
-  const supabase = useSupabaseClient();
-
   const [files, setFiles] = useState<FileData[]>([]);
-  const [showVersionModal, setShowVersionModal] = useState<boolean>(false);
+  const [showVersionModal, setShowVersionModal] = useState(false);
   const [versionModalFileId, setVersionModalFileId] = useState<string | null>(null);
   const [versions, setVersions] = useState<Version[]>([]);
+  const router = useRouter();
 
-  /**
-   * Logs the user out and redirects to the home page.
-   */
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push('/');
-  };
-
-  /**
-   * Fetches the list of files from the server.
-   */
+  // Fetch all files
   const fetchFiles = async () => {
     try {
       const response = await fetch('/api/files/list');
@@ -63,23 +35,27 @@ const Dashboard: React.FC = () => {
         const data = await response.json();
         setFiles(data);
       } else {
-        console.error('Failed to fetch files list: ', response.statusText);
+        console.error('Failed to fetch files list:', response.statusText);
       }
     } catch (error) {
       console.error('Error fetching files:', error);
     }
   };
 
+  // Called after component mounts
   useEffect(() => {
     fetchFiles();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /**
-   * Renames a file by calling the /api/files/manage endpoint with method=PUT.
-   * @param fileId - The ID of the file to rename.
-   * @param newName - The new name for the file.
-   */
+  // Called by FileUpload after a file is successfully uploaded
+  const handleFileUploaded = (newFile: FileData) => {
+    // Option 1: Append new file to the existing array
+    setFiles((prev) => [newFile, ...prev]);
+
+    // Option 2 (alternative): Re-fetch all files to ensure the list is up to date
+    // fetchFiles();
+  };
+
   const handleRename = async (fileId: string, newName: string) => {
     try {
       const response = await fetch('/api/files/manage', {
@@ -101,10 +77,6 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  /**
-   * Deletes a file by calling the /api/files/manage endpoint with method=DELETE.
-   * @param fileId - The ID of the file to delete.
-   */
   const handleDelete = async (fileId: string) => {
     try {
       const response = await fetch('/api/files/manage', {
@@ -122,10 +94,6 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  /**
-   * Initiates the proofreading process for a file by calling /api/proofreading/process.
-   * @param fileId - The ID of the file to proofread.
-   */
   const handleProofread = async (fileId: string) => {
     try {
       const response = await fetch('/api/proofreading/process', {
@@ -143,10 +111,6 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  /**
-   * Fetches version history for a file and opens the VersionControlModal.
-   * @param fileId - The ID of the file whose version history should be viewed.
-   */
   const handleViewVersions = async (fileId: string) => {
     try {
       const response = await fetch(`/api/files/versions?fileId=${fileId}`);
@@ -163,10 +127,6 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  /**
-   * Rolls back the file to the previous version by calling /api/files/rollback with rollbackType='previous'.
-   * @param versionId - The ID of the version (unused in this default logic, but included if needed).
-   */
   const handleRollbackVersion = async (versionId: string) => {
     if (!versionModalFileId) return;
     try {
@@ -190,9 +150,6 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  /**
-   * Rolls back the file to its original text by calling /api/files/rollback with rollbackType='original'.
-   */
   const handleRollbackOriginal = async () => {
     if (!versionModalFileId) return;
     try {
@@ -216,9 +173,6 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  /**
-   * Closes the version control modal.
-   */
   const handleCloseModal = () => {
     setShowVersionModal(false);
     setVersionModalFileId(null);
@@ -226,33 +180,38 @@ const Dashboard: React.FC = () => {
   };
 
   return (
-    <MainLayout user={session?.user} onLogout={handleLogout}>
-      <div className="min-h-screen bg-gray-100 p-4 sm:p-6 md:p-8 transition-all duration-300">
-        <h1 className="text-3xl font-bold mb-6">Dashboard</h1>
-        <div className="mb-8">
-          <FileUpload />
-        </div>
-        <div>
-          <h2 className="text-2xl font-semibold mb-4">Your Files</h2>
-          <FileList 
-            files={files} 
-            onRename={handleRename} 
-            onDelete={handleDelete} 
-            onProofread={handleProofread}
-            onViewVersions={handleViewVersions}
-          />
-        </div>
-        {showVersionModal && versionModalFileId && (
-          <VersionControlModal
-            isOpen={showVersionModal}
-            versions={versions}
-            onClose={handleCloseModal}
-            onRollbackVersion={handleRollbackVersion}
-            onRollbackOriginal={handleRollbackOriginal}
-          />
-        )}
-      </div>
-    </MainLayout>
+    <Container sx={{ py: 4 }}>
+      <Typography variant="h4" gutterBottom>
+        Dashboard
+      </Typography>
+
+      {/*
+        Pass our handleFileUploaded callback to FileUpload so it can
+        notify us of the newly created file object.
+      */}
+      <FileUpload onFileUploaded={handleFileUploaded} />
+
+      <Box mt={4}>
+        <Typography variant="h5" gutterBottom>
+          Your Files
+        </Typography>
+        <FileList
+          files={files}
+          onRename={handleRename}
+          onDelete={handleDelete}
+          onProofread={handleProofread}
+          onViewVersions={handleViewVersions}
+        />
+      </Box>
+
+      <VersionControlModal
+        isOpen={showVersionModal}
+        versions={versions}
+        onClose={handleCloseModal}
+        onRollbackVersion={handleRollbackVersion}
+        onRollbackOriginal={handleRollbackOriginal}
+      />
+    </Container>
   );
 };
 
