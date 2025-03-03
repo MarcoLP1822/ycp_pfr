@@ -1,37 +1,69 @@
 /**
  * @file components/Layout/Sidebar.tsx
  * @description
- * This component renders a sidebar for the application.
- * It provides navigation links for quick access to key pages such as the Dashboard and Proofreading.
- * 
+ * This component renders a collapsible sidebar for the application.
+ * It provides a navigation menu that is responsive and uses the mocha color palette,
+ * aligning with a modern, sleek, and minimalist design. The sidebar is collapsible
+ * on mobile devices with a toggle button (hamburger icon), while it remains permanently
+ * visible on larger screens.
+ *
  * Key features:
- * - Displays a vertical navigation menu using Tailwind CSS.
- * - Contains links that guide the user to different parts of the application.
- * 
+ * - Collapsible menu on mobile devices with smooth transitions.
+ * - Responsive design using Tailwind CSS breakpoints.
+ * - Uses mocha-light for the sidebar background and mocha-dark for text.
+ * - Hover effects for navigation links with transition animations.
+ *
  * @dependencies
- * - React: For component creation.
+ * - React: For state management and rendering.
  * - Next.js Link: For client-side navigation.
- * 
+ *
  * @notes
- * - You can add additional navigation links as needed.
+ * - The toggle button is only visible on mobile (using md:hidden).
+ * - The sidebar is fixed on mobile to overlay content and relative on desktop.
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 
 const Sidebar: React.FC = () => {
+  // State to track whether the sidebar is collapsed on mobile devices
+  const [isCollapsed, setIsCollapsed] = useState(true);
+
   return (
-    <aside className="bg-gray-200 w-64 min-h-screen p-4">
-      <nav className="space-y-4">
-        <Link href="/dashboard">
-          <a className="block text-gray-700 hover:text-blue-500">Dashboard</a>
-        </Link>
-        <Link href="/proofreading">
-          <a className="block text-gray-700 hover:text-blue-500">Proofreading</a>
-        </Link>
-        {/* Future navigation links can be added here */}
-      </nav>
-    </aside>
+    <div>
+      {/* Toggle button for mobile devices */}
+      <button
+        className="md:hidden p-2 bg-mocha text-white rounded focus:outline-none focus:ring-2 focus:ring-mocha-light"
+        onClick={() => setIsCollapsed(!isCollapsed)}
+        aria-label="Toggle Navigation Menu"
+      >
+        {/* Simple hamburger icon using SVG */}
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
+
+      {/* Sidebar navigation panel */}
+      <aside
+        className={`bg-mocha-light text-mocha-dark w-64 min-h-screen p-4 transition-transform transform 
+                    ${isCollapsed ? '-translate-x-full' : 'translate-x-0'} 
+                    md:translate-x-0 md:block fixed md:relative z-50`}
+      >
+        <nav className="space-y-4">
+          <Link href="/dashboard">
+            <a className="block px-2 py-1 hover:bg-mocha hover:text-white rounded transition-colors">
+              Dashboard
+            </a>
+          </Link>
+          <Link href="/proofreading">
+            <a className="block px-2 py-1 hover:bg-mocha hover:text-white rounded transition-colors">
+              Proofreading
+            </a>
+          </Link>
+          {/* Future navigation links can be added here */}
+        </nav>
+      </aside>
+    </div>
   );
 };
 
