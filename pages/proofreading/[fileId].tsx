@@ -86,10 +86,11 @@ const ProofreadingInterfacePage: React.FC = () => {
       {/* Header with a link back to Dashboard */}
       <header className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold text-mocha-dark">Proofreading Interface</h1>
-        <Link href="/dashboard">
-          <a className="text-mocha-dark hover:underline transition-colors duration-300">
-            Back to Dashboard
-          </a>
+        <Link
+          href="/dashboard"
+          className="text-mocha-dark hover:underline transition-colors duration-300"
+        >
+          Back to Dashboard
         </Link>
       </header>
 

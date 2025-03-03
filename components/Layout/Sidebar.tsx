@@ -49,15 +49,17 @@ const Sidebar: React.FC = () => {
                     md:translate-x-0 md:block fixed md:relative z-50`}
       >
         <nav className="space-y-4" aria-label="Sidebar Navigation">
-          <Link href="/dashboard">
-            <a className="block px-2 py-1 hover:bg-mocha hover:text-white rounded transition-colors">
-              Dashboard
-            </a>
+          <Link
+            href="/dashboard"
+            className="block px-2 py-1 hover:bg-mocha hover:text-white rounded transition-colors"
+          >
+            Dashboard
           </Link>
-          <Link href="/proofreading">
-            <a className="block px-2 py-1 hover:bg-mocha hover:text-white rounded transition-colors">
-              Proofreading
-            </a>
+          <Link
+            href="/proofreading"
+            className="block px-2 py-1 hover:bg-mocha hover:text-white rounded transition-colors"
+          >
+            Proofreading
           </Link>
           {/* Future navigation links can be added here */}
         </nav>

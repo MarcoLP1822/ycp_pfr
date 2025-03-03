@@ -32,13 +32,12 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout }) => {
     <header className="bg-mocha-dark text-white flex justify-between items-center px-6 py-4 shadow-md">
       {/* Application branding */}
       <div className="text-2xl font-bold">
-        <Link href="/">
-          <a 
-            className="hover:text-mocha-light transition-colors duration-300"
-            aria-label="Go to Home"
-          >
-            Proofreading App
-          </a>
+        <Link
+          href="/"
+          className="hover:text-mocha-light transition-colors duration-300"
+          aria-label="Go to Home"
+        >
+          Proofreading App
         </Link>
       </div>
       {/* Navigation controls */}
@@ -52,13 +51,12 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout }) => {
             Logout
           </button>
         ) : (
-          <Link href="/">
-            <a
-              className="bg-mocha hover:bg-mocha-light text-white px-4 py-2 rounded transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-mocha-light"
-              aria-label="Login"
-            >
-              Login
-            </a>
+          <Link
+            href="/"
+            className="bg-mocha hover:bg-mocha-light text-white px-4 py-2 rounded transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-mocha-light"
+            aria-label="Login"
+          >
+            Login
           </Link>
         )}
       </nav>

@@ -66,11 +66,11 @@ export interface ProofreadingResult {
       messages: [
         {
           role: "system",
-          content: "You are an AI proofreading assistant that corrects grammar, punctuation, and spelling errors. Return a corrected version of the text with inline highlights (using markup such as <mark> tags) if corrections were made."
+          content: "You are an AI proofreading assistant that corrects grammar, punctuation, and spelling errors. Return only the plain corrected version of the text."
         },
         {
           role: "user",
-          content: `Please proofread the following text:\n\n"${text}"`
+          content: `\n\n"${text}"`
         }
       ],
       temperature: 0.2,
