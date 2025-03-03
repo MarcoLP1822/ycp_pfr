@@ -1,17 +1,26 @@
 /**
  * @file components/ProofreadingInterface.tsx
  * @description
- * This component displays a two-column interface for proofreading:
- * - Left: Original text (plain)
- * - Right: Corrected text with <mark> highlights
+ * This component renders a split-view interface for proofreading:
+ * - Left side displays the original plain text.
+ * - Right side displays the corrected text with inline highlights (<mark> tags).
+ * 
+ * Enhancements:
+ * - Uses a subtle mocha-light background for the container.
+ * - Includes smooth transition effects on the text areas.
+ * - Applies modern typography and ample white space.
+ *
+ * Key features:
+ * - Split-view layout for clear differentiation.
+ * - Optional callback support for accepting individual corrections or all corrections.
  *
  * @dependencies
- * - React for rendering
- * - CorrectionControls (optional) for accept-all, etc.
+ * - React for component rendering and event handling.
+ * - CorrectionControls for bulk correction acceptance.
  *
  * @notes
- * - This is an optional component that you can integrate into your pages.
- * - The key idea is that 'originalText' is raw, 'correctedText' has <mark>.
+ * - Ensure that the Tailwind configuration includes the mocha color palette.
+ * - This component is designed to be responsive and works well on various devices.
  */
 
 import React, { FC, MouseEvent } from 'react';
@@ -19,22 +28,19 @@ import CorrectionControls from './CorrectionControls';
 
 export interface ProofreadingInterfaceProps {
   /**
-   * Plain original text
+   * The plain original text.
    */
   originalText: string;
-
   /**
-   * Highlighted corrected text, containing <mark> tags
+   * The corrected text with inline <mark> highlights.
    */
   correctedText: string;
-
   /**
-   * Callback for accepting an individual correction (optional)
+   * Callback when an individual correction is accepted.
    */
   onAcceptIndividual?: (correctionIdentifier: string) => void;
-
   /**
-   * Callback for accepting all corrections in bulk
+   * Callback to accept all corrections in bulk.
    */
   onAcceptAll?: () => void;
 }
@@ -45,6 +51,10 @@ const ProofreadingInterface: FC<ProofreadingInterfaceProps> = ({
   onAcceptIndividual,
   onAcceptAll,
 }) => {
+  /**
+   * Handles click events on the corrected text.
+   * If a <mark> element is clicked, its correction identifier is passed to the onAcceptIndividual callback.
+   */
   const handleCorrectionClick = (e: MouseEvent<HTMLDivElement>) => {
     if (!onAcceptIndividual) return;
     const target = e.target as HTMLElement;
@@ -57,33 +67,31 @@ const ProofreadingInterface: FC<ProofreadingInterfaceProps> = ({
   };
 
   return (
-    <div className="p-6 bg-gray-100">
-      <h1 className="text-3xl font-bold mb-6">Proofreading Interface</h1>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div className="p-6 bg-mocha-light min-h-screen">
+      <h1 className="text-3xl font-bold mb-6 text-mocha-dark">Proofreading Interface</h1>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Original Text Column */}
-        <div className="bg-white p-4 rounded shadow">
-          <h2 className="text-xl font-semibold mb-2">Original Text</h2>
+        <div className="bg-white p-4 rounded shadow transition-all duration-300">
+          <h2 className="text-xl font-semibold mb-3 text-mocha-dark">Original Text</h2>
           <textarea
             readOnly
-            className="w-full h-64 p-2 border rounded resize-none"
+            className="w-full h-72 p-3 border border-mocha-light rounded resize-none transition-all duration-300"
             value={originalText}
           />
         </div>
-
         {/* Corrected Text Column */}
-        <div className="bg-white p-4 rounded shadow">
-          <h2 className="text-xl font-semibold mb-2">Corrected Text</h2>
+        <div className="bg-white p-4 rounded shadow transition-all duration-300">
+          <h2 className="text-xl font-semibold mb-3 text-mocha-dark">Corrected Text</h2>
           <div
-            className="w-full h-64 p-2 border rounded overflow-auto whitespace-pre-wrap"
+            className="w-full h-72 p-3 border border-mocha-light rounded overflow-auto whitespace-pre-wrap transition-all duration-300"
             dangerouslySetInnerHTML={{ __html: correctedText }}
             onClick={handleCorrectionClick}
           />
         </div>
       </div>
-
       {/* Optional Correction Controls */}
       {onAcceptAll && (
-        <div className="mt-4">
+        <div className="mt-6">
           <CorrectionControls onAcceptAll={onAcceptAll} />
         </div>
       )}
