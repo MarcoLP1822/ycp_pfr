@@ -163,13 +163,14 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUploaded }) => {
         )}
 
         <Box display="flex" alignItems="center" gap={2}>
-          {/* Hidden file input */}
+          {/* Hidden file input with aria-label */}
           <input
             type="file"
             accept=".doc,.docx,.odt,.odf,.txt"
             onChange={handleFileChange}
             style={{ display: 'none' }}
             id="file-input"
+            aria-label="File Upload Input"
           />
           <label htmlFor="file-input">
             <Button variant="contained" component="span">
