@@ -2,40 +2,35 @@
  * @file pages/api/files/versions.ts
  * @description
  * API endpoint to list version history for a specific file based on proofreading logs.
- * It retrieves all proofreading_logs entries for the provided fileId, orders them by timestamp (ascending),
- * and maps them to version objects containing an id, versionNumber, timestamp, and description.
+ * It now limits the result to a maximum of 5 logs (the most recent 5).
  *
  * Key features:
- * - Supports GET requests only.
- * - Validates the fileId query parameter.
- * - Maps proofreading_logs to a version list for display in the VersionControlModal.
+ * - Supports GET requests only
+ * - Validates the fileId query parameter
+ * - Returns up to 5 logs from the newest to oldest
  *
  * @dependencies
- * - Next.js API types for request and response handling.
- * - Drizzle ORM for database queries.
- * - Database schema from db/schema.ts for the 'proofreading_logs' table.
- * - Logger service for logging events.
- *
- * @notes
- * - Ensure that the middleware or authentication is handling access to this endpoint as needed.
+ * - Drizzle ORM
+ * - Database schema from db/schema.ts
+ * - Logger
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import drizzleClient from '../../../services/drizzleClient';
 import { proofreadingLogs } from '../../../db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, desc } from 'drizzle-orm';
 import Logger from '../../../services/logger';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   Logger.info(`GET /api/files/versions invoked with method ${req.method}.`);
 
-  // Allow only GET requests
+  // Allow only GET
   if (req.method !== 'GET') {
     Logger.warn('Method not allowed on versions endpoint.');
     return res.status(405).json({ error: 'Method not allowed. Only GET requests are accepted.' });
   }
 
-  // Validate fileId query parameter
+  // Validate fileId
   const { fileId } = req.query;
   if (!fileId || typeof fileId !== 'string') {
     Logger.error('Missing or invalid fileId parameter.');
@@ -43,19 +38,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    // Retrieve proofreading logs for the given fileId, ordered by timestamp ascending
+    // Retrieve up to the last 5 logs, newest first
     const logs = await drizzleClient
       .select()
       .from(proofreadingLogs)
       .where(eq(proofreadingLogs.file_id, fileId))
-      .orderBy(proofreadingLogs.timestamp);
+      .orderBy(desc(proofreadingLogs.timestamp))
+      .limit(5);
+
+    // If you want them oldest->newest in the final result, do logs.reverse():
+    const logsOrdered = logs.slice().reverse();
 
     // Map logs to version objects with sequential version numbers
-    const versions = logs.map((log, index) => ({
+    // versionNumber: index + 1 means 1-based indexing from oldest->newest
+    const versions = logsOrdered.map((log, index) => ({
       id: log.log_id,
       versionNumber: index + 1,
       timestamp: log.timestamp.toISOString(),
-      description: 'Proofreading revision'
+      description: 'Proofreading revision',
     }));
 
     Logger.info(`Retrieved ${versions.length} versions for fileId: ${fileId}`);

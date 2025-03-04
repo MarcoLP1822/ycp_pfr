@@ -1,23 +1,19 @@
 /**
  * @file components/FileItem.tsx
  * @description
- * Represents an individual file item in the list using Material UI. 
- * Now pressing Enter in the rename text field will confirm the rename.
+ * Represents an individual file item in the list using Material UI.
+ * We now have a new button “View Current” that calls onViewCurrent.
  *
  * Key features:
- * - Uses MUI Card, CardContent, CardActions for layout
  * - Inline rename with a TextField
- * - Press Enter to confirm rename
  * - Delete confirmation dialog
- * - Proofread and Version History buttons
+ * - Proofread triggers re-proofreading
+ * - Version History opens the modal
+ * - NEW: “View Current” to open the existing version at /proofreading/[fileId]
  *
  * @dependencies
- * - React: For state management
- * - Material UI: Card, CardContent, CardActions, Button, Typography, TextField, Dialog, etc.
- * - onDelete callback triggers the actual file deletion in the parent
- *
- * @notes
- * - We detect Enter in the text field with onKeyDown. If e.key === 'Enter', we call handleRename().
+ * - React
+ * - Material UI
  */
 
 import React, { useState } from 'react';
@@ -42,6 +38,7 @@ interface FileItemProps {
   onDelete: (fileId: string) => void;
   onProofread: (fileId: string) => void;
   onViewVersions: (fileId: string) => void;
+  onViewCurrent: (fileId: string) => void; // NEW
 }
 
 const FileItem: React.FC<FileItemProps> = ({
@@ -50,6 +47,7 @@ const FileItem: React.FC<FileItemProps> = ({
   onDelete,
   onProofread,
   onViewVersions,
+  onViewCurrent,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [newName, setNewName] = useState(file.file_name);
@@ -57,10 +55,7 @@ const FileItem: React.FC<FileItemProps> = ({
   // State to control the delete confirmation dialog
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
-  /**
-   * Handles the rename action when user finishes editing.
-   * If there's a valid, changed name, calls onRename callback.
-   */
+  // Called to finalize the rename
   const handleRename = () => {
     if (newName.trim() && newName !== file.file_name) {
       onRename(file.file_id, newName);
@@ -93,15 +88,15 @@ const FileItem: React.FC<FileItemProps> = ({
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               onBlur={handleRename}
-              autoFocus
-              size="small"
-              label="File name"
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
-                  e.preventDefault(); // prevent form submission or any default
+                  e.preventDefault();
                   handleRename();
                 }
               }}
+              autoFocus
+              size="small"
+              label="File name"
             />
           ) : (
             <Typography variant="subtitle1" fontWeight="bold">
@@ -121,7 +116,7 @@ const FileItem: React.FC<FileItemProps> = ({
             variant="outlined"
             onClick={() => setIsEditing(true)}
           >
-            RINOMINA
+            Rename
           </Button>
           <Button
             size="small"
@@ -129,14 +124,22 @@ const FileItem: React.FC<FileItemProps> = ({
             color="error"
             onClick={handleDeleteClick}
           >
-            ELIMINA
+            Delete
           </Button>
           <Button
             size="small"
             variant="contained"
             onClick={() => onProofread(file.file_id)}
           >
-            PROOFREAD
+            Proofread
+          </Button>
+          <Button
+            size="small"
+            variant="contained"
+            color="info"
+            onClick={() => onViewCurrent(file.file_id)}
+          >
+            View Current
           </Button>
           <Button
             size="small"
@@ -144,7 +147,7 @@ const FileItem: React.FC<FileItemProps> = ({
             color="secondary"
             onClick={() => onViewVersions(file.file_id)}
           >
-            VERSION HISTORY
+            Version History
           </Button>
         </CardActions>
       </Card>
@@ -157,18 +160,18 @@ const FileItem: React.FC<FileItemProps> = ({
         aria-describedby="confirm-delete-dialog-description"
       >
         <DialogTitle id="confirm-delete-dialog-title">
-          Conferma eliminazione
+          Confirm Delete
         </DialogTitle>
         <DialogContent>
           <DialogContentText id="confirm-delete-dialog-description">
-            Sei sicuro di voler eliminare <strong>{file.file_name}</strong>?
-            Questa azione è irreversibile.
+            Are you sure you want to delete <strong>{file.file_name}</strong>?
+            This action cannot be undone.
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCancelDelete}>Annulla</Button>
+          <Button onClick={handleCancelDelete}>Cancel</Button>
           <Button onClick={handleConfirmDelete} autoFocus color="error" variant="contained">
-            Elimina
+            Delete
           </Button>
         </DialogActions>
       </Dialog>

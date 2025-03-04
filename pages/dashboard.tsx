@@ -1,12 +1,12 @@
 /**
  * @file pages/dashboard.tsx
  * @description
- * Dashboard page that integrates file upload, file listing, and version control.
- * Uses Material UI for a consistent design. 
+ * Dashboard page that integrates file upload, file listing, version control,
+ * and now a button to “View Current Version” without re-proofreading.
  *
  * Key changes:
- * - Added `handleFileUploaded` to update `files` state when a file is successfully uploaded.
- * - Pass `onFileUploaded` to <FileUpload> so new files appear without a page refresh.
+ * - Added `handleViewCurrentVersion` that just routes to `/proofreading/[fileId]`.
+ * - Passed it to <FileList> as onViewCurrent
  */
 
 import React, { useState, useEffect } from 'react';
@@ -27,7 +27,6 @@ const Dashboard: React.FC = () => {
   const [versions, setVersions] = useState<Version[]>([]);
   const router = useRouter();
 
-  // Fetch all files
   const fetchFiles = async () => {
     try {
       const response = await fetch('/api/files/list');
@@ -42,18 +41,13 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  // Called after component mounts
   useEffect(() => {
     fetchFiles();
   }, []);
 
-  // Called by FileUpload after a file is successfully uploaded
+  // Called after a new file is uploaded
   const handleFileUploaded = (newFile: FileData) => {
-    // Option 1: Append new file to the existing array
     setFiles((prev) => [newFile, ...prev]);
-
-    // Option 2 (alternative): Re-fetch all files to ensure the list is up to date
-    // fetchFiles();
   };
 
   const handleRename = async (fileId: string, newName: string) => {
@@ -94,6 +88,7 @@ const Dashboard: React.FC = () => {
     }
   };
 
+  // Re-runs the AI proofreading process
   const handleProofread = async (fileId: string) => {
     try {
       const response = await fetch('/api/proofreading/process', {
@@ -105,10 +100,16 @@ const Dashboard: React.FC = () => {
         console.error('Proofreading process failed:', response.statusText);
         return;
       }
+      // Once done, route to the newly updated version
       router.push(`/proofreading/${fileId}`);
     } catch (error) {
       console.error('Error triggering proofreading process:', error);
     }
+  };
+
+  // Opens the existing proofread version without re-proofreading
+  const handleViewCurrentVersion = (fileId: string) => {
+    router.push(`/proofreading/${fileId}`);
   };
 
   const handleViewVersions = async (fileId: string) => {
@@ -185,10 +186,7 @@ const Dashboard: React.FC = () => {
         Dashboard
       </Typography>
 
-      {/*
-        Pass our handleFileUploaded callback to FileUpload so it can
-        notify us of the newly created file object.
-      */}
+      {/* Pass handleFileUploaded so newly uploaded files appear without refresh */}
       <FileUpload onFileUploaded={handleFileUploaded} />
 
       <Box mt={4}>
@@ -200,6 +198,7 @@ const Dashboard: React.FC = () => {
           onRename={handleRename}
           onDelete={handleDelete}
           onProofread={handleProofread}
+          onViewCurrent={handleViewCurrentVersion}
           onViewVersions={handleViewVersions}
         />
       </Box>

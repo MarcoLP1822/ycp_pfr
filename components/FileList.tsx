@@ -1,12 +1,12 @@
 /**
  * @file components/FileList.tsx
  * @description
- * This component displays a list of uploaded files using Material UI. It maps
- * over an array of file objects and renders each file with FileItem.
+ * Displays a list of uploaded files using Material UI. Each file is rendered
+ * by FileItem. We now pass `onViewCurrent` so the user can view the existing version.
  *
  * @dependencies
  * - React
- * - FileItem: MUI-based file item
+ * - FileItem
  */
 
 import React from 'react';
@@ -28,6 +28,7 @@ interface FileListProps {
   onDelete: (fileId: string) => void;
   onProofread: (fileId: string) => void;
   onViewVersions: (fileId: string) => void;
+  onViewCurrent: (fileId: string) => void; // NEW callback
 }
 
 const FileList: React.FC<FileListProps> = ({
@@ -36,6 +37,7 @@ const FileList: React.FC<FileListProps> = ({
   onDelete,
   onProofread,
   onViewVersions,
+  onViewCurrent,
 }) => {
   if (files.length === 0) {
     return <p>No files uploaded yet.</p>;
@@ -51,6 +53,7 @@ const FileList: React.FC<FileListProps> = ({
           onDelete={onDelete}
           onProofread={onProofread}
           onViewVersions={onViewVersions}
+          onViewCurrent={onViewCurrent}
         />
       ))}
     </div>

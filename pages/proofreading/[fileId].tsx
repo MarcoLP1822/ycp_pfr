@@ -1,23 +1,14 @@
 /**
  * @file pages/proofreading/[fileId].tsx
  * @description
- * This page renders a dynamic split-view proofreading interface for a specific file.
- * - Left side: Shows the plain original text.
- * - Right side: Shows the corrected text with inline highlights (<mark> tags).
+ * Dynamic page for proofreading a specific file. Displays:
+ * - Original text (read-only)
+ * - Corrected text (with <mark> highlights)
+ * - The file's current version number
  *
- * Enhancements:
- * - Uses a mocha-light background for a modern aesthetic.
- * - Implements smooth transitions and ample white space for better readability.
- * - Provides clear navigation back to the dashboard.
- *
- * @dependencies
- * - React for component state and effects.
- * - Next.js router for dynamic routing.
- * - Link from Next.js for navigation.
- *
- * @notes
- * - Ensure that the API endpoint /api/proofreading/details returns both originalText and correctedText.
- * - This page is designed to be responsive and should work across different devices.
+ * Key changes:
+ * - Removed the nested <a> inside <Link>. We now style <Link> directly.
+ * - Everything else remains the same.
  */
 
 import React, { useEffect, useState } from 'react';
@@ -25,14 +16,9 @@ import { useRouter } from 'next/router';
 import Link from 'next/link';
 
 interface ProofreadingData {
-  /**
-   * The original plain text extracted from the file.
-   */
   originalText: string;
-  /**
-   * The corrected text with inline highlights (<mark> tags).
-   */
   correctedText: string;
+  versionNumber?: number; // optional
 }
 
 const ProofreadingInterfacePage: React.FC = () => {
@@ -67,54 +53,70 @@ const ProofreadingInterfacePage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-mocha-light">
-        <p className="text-2xl text-mocha-dark">Loading proofreading data...</p>
+      <div style={{ minHeight: '100vh', padding: '2rem' }}>
+        <p>Loading proofreading data...</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-mocha-light">
-        <p className="text-2xl text-red-500">{error}</p>
+      <div style={{ minHeight: '100vh', padding: '2rem' }}>
+        <p style={{ color: 'red' }}>{error}</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-mocha-light p-6">
-      {/* Header with a link back to Dashboard */}
-      <header className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-mocha-dark">Proofreading Interface</h1>
-        <Link
-          href="/dashboard"
-          className="text-mocha-dark hover:underline transition-colors duration-300"
-        >
-          Back to Dashboard
-        </Link>
-      </header>
-
-      {/* Display file ID for reference */}
-      <div className="mb-4">
-        <p className="text-base text-mocha-dark">File ID: {fileId}</p>
+    <div style={{ minHeight: '100vh', padding: '2rem' }}>
+      <h1 style={{ marginBottom: '1rem' }}>Proofreading Interface</h1>
+      <div style={{ marginBottom: '1rem' }}>
+        <p>File ID: {fileId}</p>
+        {data?.versionNumber && <p>Current Version: {data.versionNumber}</p>}
       </div>
 
-      {/* Split-view layout for original and corrected texts */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Original Text Panel */}
-        <div className="bg-white p-4 rounded shadow transition-all duration-300">
-          <h2 className="text-xl font-semibold mb-3 text-mocha-dark">Original Text</h2>
+      {/* Instead of <a> inside <Link>, we just style the Link itself */}
+      <Link
+        href="/dashboard"
+        style={{
+          marginBottom: '2rem',
+          display: 'inline-block',
+          textDecoration: 'underline',
+          color: '#333',
+        }}
+      >
+        Back to Dashboard
+      </Link>
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: '1rem',
+          marginTop: '1rem',
+        }}
+      >
+        {/* Original Text */}
+        <div style={{ border: '1px solid #ccc', padding: '1rem' }}>
+          <h2>Original Text</h2>
           <textarea
             readOnly
-            className="w-full h-72 p-3 border border-mocha-light rounded resize-none transition-all duration-300"
+            style={{ width: '100%', height: '400px', marginTop: '0.5rem' }}
             value={data?.originalText || ''}
           />
         </div>
-        {/* Corrected Text Panel */}
-        <div className="bg-white p-4 rounded shadow transition-all duration-300">
-          <h2 className="text-xl font-semibold mb-3 text-mocha-dark">Corrected Text</h2>
+
+        {/* Corrected Text */}
+        <div style={{ border: '1px solid #ccc', padding: '1rem' }}>
+          <h2>Corrected Text</h2>
           <div
-            className="w-full h-72 p-3 border border-mocha-light rounded overflow-auto whitespace-pre-wrap transition-all duration-300"
+            style={{
+              width: '100%',
+              height: '400px',
+              marginTop: '0.5rem',
+              overflow: 'auto',
+              whiteSpace: 'pre-wrap',
+            }}
             dangerouslySetInnerHTML={{ __html: data?.correctedText || '' }}
           />
         </div>

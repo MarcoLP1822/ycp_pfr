@@ -1,44 +1,40 @@
 /**
  * @file pages/api/proofreading/details.ts
  * @description
- * Questo endpoint API recupera i dettagli del proofreading per un file specifico.
- * I passaggi sono:
- *  - Validazione della richiesta GET e estrazione del parametro fileId.
- *  - Recupero dell'ultima voce di proofreading_logs per il file.
- *  - Recupero del record del file dal database per ottenere file_url e file_type.
- *  - Download del file da Supabase Storage ed estrazione del testo originale.
- *  - Restituzione di un JSON contenente il testo originale e il testo corretto (con evidenziazione diff-based).
+ * This endpoint retrieves the proofreading details for a file.
+ * It returns:
+ * - originalText: The text as originally uploaded (from files.original_text)
+ * - correctedText: The current text with highlighting applied (computed via diffHighlighter by comparing original_text and current_text)
+ * - versionNumber: The file's current version number.
+ *
+ * This way, if you perform a rollback (which updates files.current_text), then the highlighted differences
+ * will be recalculated and "View Current Version" will display the rolled-back content.
  *
  * @dependencies
- * - Tipi API di Next.js
- * - Drizzle ORM per operazioni di database.
- * - Supabase Auth Helpers (usando createPagesServerClient)
- * - extractTextFromFile da services/textExtractor
- * - Logger per il logging.
+ * - Drizzle ORM for database queries
+ * - Logger for logging
+ * - diffHighlighter to compute inline highlighting differences
  *
  * @notes
- * - Assicurati che l'ambiente sia correttamente configurato.
+ * - This simplified version does not download or re-extract the file from storage.
+ *   It assumes that files.original_text and files.current_text are up to date.
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import drizzleClient from '../../../services/drizzleClient';
-import { files, proofreadingLogs } from '../../../db/schema';
-import { eq, desc } from 'drizzle-orm';
-import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
-import { extractTextFromFile, SupportedFileType } from '../../../services/textExtractor';
+import { files } from '../../../db/schema';
+import { eq } from 'drizzle-orm';
 import Logger from '../../../services/logger';
-import { ProofreadingResult } from '../../../services/openaiService';
+import { highlightDifferences } from '../../../services/diffHighlighter';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   Logger.info(`GET /api/proofreading/details invoked with method ${req.method}.`);
 
-  // Consenti solo richieste GET.
   if (req.method !== 'GET') {
     Logger.warn('Method not allowed on proofreading details endpoint.');
     return res.status(405).json({ error: 'Method not allowed. Only GET requests are accepted.' });
   }
 
-  // Estrai fileId dai parametri della query e valida.
   const { fileId } = req.query;
   if (!fileId || typeof fileId !== 'string') {
     Logger.error('Missing or invalid fileId parameter.');
@@ -46,57 +42,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    // Recupera l'ultima voce di proofreading_logs per il file
-    const logs = await drizzleClient
-      .select()
-      .from(proofreadingLogs)
-      .where(eq(proofreadingLogs.file_id, fileId))
-      .orderBy(desc(proofreadingLogs.timestamp));
-
-    if (!logs || logs.length === 0) {
-      Logger.error(`Proofreading details not found for fileId: ${fileId}`);
-      return res.status(404).json({ error: 'Proofreading details not found.' });
-    }
-    const logEntry = logs[0];
-
-    // Recupera il record del file per ottenere file_url e file_type
+    // Fetch the file record from the database
     const fileRecords = await drizzleClient
       .select()
       .from(files)
       .where(eq(files.file_id, fileId));
-    if (!fileRecords || fileRecords.length === 0) {
-      Logger.error(`File record not found for fileId: ${fileId}`);
-      return res.status(404).json({ error: 'File record not found.' });
+    if (!fileRecords.length) {
+      Logger.error(`File not found for fileId: ${fileId}`);
+      return res.status(404).json({ error: 'File not found.' });
     }
     const fileRecord = fileRecords[0];
 
-    // Crea un client Supabase per scaricare il file.
-    const supabase = createPagesServerClient({ req, res });
-    const bucketName = 'uploads';
-    const { data: downloadData, error: downloadError } = await supabase.storage
-      .from(bucketName)
-      .download(fileRecord.file_url);
+    // Compute highlighted corrected text using diffHighlighter,
+    // which compares the original text and the current (possibly rolled-back) text.
+    const highlightedText = highlightDifferences(fileRecord.original_text, fileRecord.current_text);
 
-    if (downloadError || !downloadData) {
-      Logger.error(`Failed to download file: ${downloadError?.message}`);
-      return res.status(500).json({ error: 'Failed to download file for original text extraction.' });
-    }
-
-    // Converti il Blob in un Buffer.
-    const arrayBuffer = await downloadData.arrayBuffer();
-    const fileBuffer = Buffer.from(new Uint8Array(arrayBuffer));
-
-    // Estrai il testo originale dal file.
-    const fileType = fileRecord.file_type.toLowerCase() as SupportedFileType;
-    const originalText = await extractTextFromFile(fileBuffer, fileType);
-
-    // Cast delle correzioni al tipo ProofreadingResult.
-    const corrections = logEntry.corrections as ProofreadingResult;
-
-    Logger.info(`Successfully fetched proofreading details for fileId: ${fileId}`);
+    Logger.info(`Successfully fetched file details for fileId: ${fileId}`);
     return res.status(200).json({
-      originalText,
-      correctedText: corrections.correctedText,
+      originalText: fileRecord.original_text,
+      correctedText: highlightedText,
+      versionNumber: fileRecord.version_number,
     });
   } catch (error: any) {
     Logger.error(`Error fetching proofreading details: ${error.message}`);

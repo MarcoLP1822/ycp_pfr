@@ -6,30 +6,19 @@
  *  2. Updates the file's status to 'in-progress'.
  *  3. Downloads and extracts the file text from Supabase Storage.
  *  4. Calls OpenAI to get a corrected version of the text.
- *  5. Generates a diff-based highlighted version of the text (<mark> tags).
+ *  5. Generates a diff-based highlighted version (<mark> tags).
  *  6. Saves both the plain corrected text and the highlighted text to proofreading_logs.
- *  7. Updates the file's current_text with the plain corrected text (no <mark> tags),
- *     so that we don't store leftover HTML markup.
+ *  7. Increments version_number by 1 and updates the file's current_text with the plain corrected text.
  *  8. Sets proofreading_status to 'complete'.
  *
- * Key changes:
- * - We only store the plain corrected text (proofreadingResult.correctedText) in `files.current_text`,
- *   avoiding leftover <mark> tags in the final text.
- *
- * @dependencies
- * - Next.js API types for request/response
- * - Drizzle ORM for DB queries
- * - Supabase Auth Helpers for server-side storage
- * - textExtractor for reading the doc
- * - openaiService for calling the LLM
- * - diffHighlighter for generating <mark>-based diffs
- * - Logger for logging
+ * Key change:
+ * - We now do `version_number: fileRecord.version_number + 1` to track the new version each time you proofread.
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import drizzleClient from '../../../services/drizzleClient';
 import { files, proofreadingLogs } from '../../../db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
 import { extractTextFromFile, SupportedFileType } from '../../../services/textExtractor';
 import { proofreadDocument } from '../../../services/openaiService';
@@ -133,16 +122,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     Logger.info(`Proofreading log inserted for file_id: ${file_id}`);
 
     // 8. Update the file's current_text with the plain corrected text
+    //    and increment version_number by 1
     await drizzleClient
       .update(files)
       .set({
-        proofreading_status: 'complete',
-        // Notice we store the plain corrected text, not the highlight with <mark> tags
+        proofreading_status: 'complete' as const,
         current_text: correctedText,
+        [files.version_number.name]: sql`${files.version_number} + 1`,
       })
       .where(eq(files.file_id, file_id));
 
-    Logger.info(`Proofreading status updated to 'complete' and current_text replaced for file_id: ${file_id}`);
+    Logger.info(`Proofreading status updated to 'complete', current_text replaced, version_number incremented for file_id: ${file_id}`);
 
     return res.status(200).json({
       message: 'Proofreading completed successfully.',
