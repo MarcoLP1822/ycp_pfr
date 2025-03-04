@@ -1,9 +1,8 @@
 /**
  * @file pages/api/proofreading/merge-docx.ts
  * @description
- * This API endpoint handles merging corrections into a complex DOCX file
- * by invoking an external merge service.
- *
+ * This API endpoint handles merging corrections into a complex DOCX file by invoking an external merge service.
+ * 
  * Workflow:
  * 1. Accepts a POST request with payload:
  *    - file_id: The unique identifier of the file.
@@ -15,16 +14,22 @@
  *    to the external merge service using a POST request with multipart/form-data.
  * 6. Receives the merged DOCX from the external service.
  * 7. Returns the merged DOCX file to the client with proper Content-Type and Content-Disposition headers.
- *
+ * 
+ * Fallback Mechanism (Implemented in Step 3):
+ * If the external merge service fails (non-OK response or network error), the endpoint falls back
+ * to a basic DOCX generation method using the `docx` library. This method converts the corrected text,
+ * splitting by newline characters into paragraphs, to generate a DOCX file.
+ * 
  * @dependencies
  * - drizzleClient for database operations.
  * - Supabase Storage for file retrieval.
  * - External merge service (configured via EXTERNAL_DOCX_MERGE_URL env variable).
  * - Logger for logging.
- *
+ * - docx: For generating a DOCX file as a fallback.
+ * 
  * @notes
  * - Ensure that the external merge service endpoint is reachable and properly configured.
- * - This implementation does not yet include a fallback mechanism (to be added in Step 3).
+ * - In case of failure, the fallback ensures that users still receive a DOCX file.
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -33,6 +38,7 @@ import drizzleClient from '../../../services/drizzleClient';
 import { files } from '../../../db/schema';
 import { eq } from 'drizzle-orm';
 import Logger from '../../../services/logger';
+import { Document, Packer, Paragraph, TextRun } from 'docx';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   Logger.info(`POST /api/proofreading/merge-docx invoked with method ${req.method}.`);
@@ -75,7 +81,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (downloadError || !downloadData) {
       Logger.error(`Failed to download DOCX file: ${downloadError?.message}`);
-      return res.status(500).json({ error: 'Failed to download the original DOCX file.' });
+      throw new Error('Failed to download the original DOCX file.');
     }
 
     // Convert the downloaded Blob to a Buffer
@@ -83,9 +89,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const fileBuffer = Buffer.from(new Uint8Array(arrayBuffer));
 
     // Prepare form data to send to the external merge service
-    // Create a new FormData instance. (Node.js v18+ provides a global FormData.)
     const formData = new FormData();
-    // Append the corrected text
     formData.append('correctedText', correctedText);
     // Convert the file buffer to a Blob and append it with the original file name
     const fileBlob = new Blob([fileBuffer], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
@@ -99,30 +103,63 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       body: formData,
     });
 
+    // If the external merge service returns an error, throw to trigger fallback
     if (!mergeResponse.ok) {
       const errorText = await mergeResponse.text();
       Logger.error(`External merge service error: ${mergeResponse.status} - ${errorText}`);
-      return res.status(500).json({ error: 'External merge service failed to merge the DOCX.' });
+      throw new Error('External merge service failed.');
     }
 
-    // Get the merged DOCX file as a buffer
+    // Get the merged DOCX file as a buffer from the external service
     const mergedBuffer = await mergeResponse.arrayBuffer();
-
-    Logger.info(`Successfully merged DOCX file for file_id: ${file_id}. Returning merged file to client.`);
+    Logger.info(`Successfully merged DOCX file for file_id: ${file_id} using external service.`);
 
     // Set response headers for file download
     res.setHeader(
       'Content-Type',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
     );
-    // Create a file name for the merged document (e.g., proofread-{originalName}.docx)
     const mergedFileName = `proofread-${fileRecord.file_name.replace(/\.[^/.]+$/, '')}.docx`;
     res.setHeader('Content-Disposition', `attachment; filename=${mergedFileName}`);
 
-    // Send the merged DOCX file back to the client
+    // Return the merged DOCX file to the client
     return res.status(200).send(Buffer.from(mergedBuffer));
   } catch (error: any) {
-    Logger.error(`Error in merge-docx endpoint: ${error.message}`);
-    return res.status(500).json({ error: 'Internal server error during DOCX merge process.' });
+    Logger.error(`Error in merge-docx endpoint: ${error.message}. Falling back to basic DOCX generation.`);
+    
+    try {
+      // Fallback mechanism: Generate a basic DOCX file using the corrected text.
+      // Split the corrected text by newline characters to form individual paragraphs.
+      const paragraphs = correctedText.split(/\r?\n/).map((line) => new Paragraph({
+        children: [new TextRun(line)],
+      }));
+
+      // Create a new DOCX document with the generated paragraphs.
+      const doc = new Document({
+        sections: [
+          {
+            children: paragraphs,
+          },
+        ],
+      });
+
+      // Generate the DOCX file as a buffer.
+      const fallbackBuffer = await Packer.toBuffer(doc);
+
+      // Set response headers for file download using fallback DOCX.
+      res.setHeader(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      );
+      // Use the original file name with a "proofread-" prefix.
+      const fallbackFileName = `proofread-${(await drizzleClient.select().from(files).where(eq(files.file_id, file_id)))[0].file_name.replace(/\.[^/.]+$/, '')}.docx`;
+      res.setHeader('Content-Disposition', `attachment; filename=${fallbackFileName}`);
+
+      Logger.info(`Fallback DOCX generation successful for file_id: ${file_id}. Returning fallback file.`);
+      return res.status(200).send(fallbackBuffer);
+    } catch (fallbackError: any) {
+      Logger.error(`Fallback DOCX generation failed: ${fallbackError.message}`);
+      return res.status(500).json({ error: 'Internal server error during fallback DOCX generation.' });
+    }
   }
 }
