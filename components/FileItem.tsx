@@ -114,24 +114,25 @@ const FileItem: React.FC<FileItemProps> = ({
           <Button
             size="small"
             variant="outlined"
-            onClick={() => setIsEditing(true)}
+            color="error"
+            onClick={handleDeleteClick}
           >
-            Rename
+            Elimina
           </Button>
           <Button
             size="small"
             variant="outlined"
-            color="error"
-            onClick={handleDeleteClick}
+            onClick={() => setIsEditing(true)}
           >
-            Delete
+            Rinomina
           </Button>
           <Button
             size="small"
             variant="contained"
+            color="error"
             onClick={() => onProofread(file.file_id)}
           >
-            Proofread
+            Avvia correzione
           </Button>
           <Button
             size="small"
@@ -139,12 +140,11 @@ const FileItem: React.FC<FileItemProps> = ({
             color="info"
             onClick={() => onViewCurrent(file.file_id)}
           >
-            View Current
+            Vedi Versione Corrente
           </Button>
           <Button
             size="small"
-            variant="contained"
-            color="secondary"
+            variant="outlined"
             onClick={() => onViewVersions(file.file_id)}
           >
             Version History

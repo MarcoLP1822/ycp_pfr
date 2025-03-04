@@ -9,7 +9,7 @@
  * - Next.js API types
  * - Drizzle ORM for database operations
  * - Logger service for logging
- * - createServerSupabaseClient for Supabase Storage interaction
+ * - createPagesServerClient for Supabase Storage interaction
  * - extractTextFromFile from services/textExtractor
  * - InferModel from drizzle-orm for type casting the insert payload
  */
@@ -19,7 +19,7 @@ import drizzleClient from '../../../services/drizzleClient';
 import { files } from '../../../db/schema';
 import Logger from '../../../services/logger';
 import { eq } from 'drizzle-orm';
-import { createServerSupabaseClient } from '@supabase/auth-helpers-nextjs';
+import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
 import { extractTextFromFile, SupportedFileType } from '../../../services/textExtractor';
 import { InferModel } from 'drizzle-orm';
 
@@ -66,7 +66,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     Logger.info(`File metadata inserted: ${JSON.stringify(newFile)}`);
 
     // Download the file from Supabase Storage for text extraction.
-    const supabase = createServerSupabaseClient({ req, res });
+    const supabase = createPagesServerClient({ req, res });
     const { data: downloadData, error: downloadError } = await supabase.storage
       .from('uploads')
       .download(file_url);

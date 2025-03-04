@@ -10,6 +10,7 @@
  *
  * Key changes:
  * - Added an "Edit Corrected Text" button that toggles edit mode.
+ * - Added a "Download DOCX" button that allows users to download the proofread document.
  * - When edit mode is enabled, the textarea shows plain text (HTML tags stripped).
  * - When saving changes, diffHighlighter is re-applied to produce highlighted text.
  *
@@ -79,6 +80,12 @@ const ProofreadingInterfacePage: React.FC = () => {
       setData({ ...data, correctedText: newHighlighted });
     }
     setEditMode((prev) => !prev);
+  };
+
+  // Handler to trigger DOCX download
+  const handleDownload = () => {
+    if (!fileId || typeof fileId !== 'string') return;
+    window.open(`/api/proofreading/download?fileId=${fileId}`, '_blank');
   };
 
   if (loading) {
@@ -166,20 +173,34 @@ const ProofreadingInterfacePage: React.FC = () => {
               dangerouslySetInnerHTML={{ __html: data?.correctedText || '' }}
             />
           )}
-          <Button
-            onClick={toggleEditMode}
-            style={{
-              marginTop: '1rem',
-              padding: '0.5rem 1rem',
-              backgroundColor: '#1976d2',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-            }}
-          >
-            {editMode ? 'Save Changes' : 'Edit Corrected Text'}
-          </Button>
+          <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+            <Button
+              onClick={toggleEditMode}
+              style={{
+                padding: '0.5rem 1rem',
+                backgroundColor: '#1976d2',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+              }}
+            >
+              {editMode ? 'Save Changes' : 'Edit Corrected Text'}
+            </Button>
+            <Button
+              onClick={handleDownload}
+              style={{
+                padding: '0.5rem 1rem',
+                backgroundColor: '#388e3c',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+              }}
+            >
+              Download DOCX
+            </Button>
+          </div>
         </div>
       </div>
     </Container>

@@ -66,7 +66,7 @@ export interface ProofreadingResult {
       messages: [
         {
           role: "system",
-          content: "You are an AI proofreading assistant that corrects grammar, punctuation, and spelling errors. Return only the plain corrected version of the text."
+          content: "Sei un assistente AI editor ed esperto di correzione testi che corregge errori di grammatica, punteggiatura e ortografia. Restituisci solo la versione corretta in forma semplice del testo."
         },
         {
           role: "user",
