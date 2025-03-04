@@ -25,7 +25,7 @@ import drizzleClient from '../../../services/drizzleClient';
 import { files } from '../../../db/schema';
 import { eq } from 'drizzle-orm';
 import Logger from '../../../services/logger';
-import { createServerSupabaseClient } from '@supabase/auth-helpers-nextjs';
+import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   Logger.info(`File management endpoint invoked with method ${req.method}.`);
@@ -75,7 +75,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const fileRecord = fileRecords[0];
 
       // Create a server-side Supabase client to interact with storage
-      const supabase = createServerSupabaseClient({ req, res });
+      const supabase = createPagesServerClient({ req, res });
       const bucketName = 'uploads'; // Ensure this is the correct bucket name used for file uploads
 
       // Delete the file from the bucket using the file_url stored in the record
