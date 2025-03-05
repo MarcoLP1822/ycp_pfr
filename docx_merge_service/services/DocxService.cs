@@ -8,6 +8,7 @@
  * Key features:
  * - OpenDocument(Stream stream): Opens a DOCX document in read/write mode.
  * - MergeDocument(MemoryStream originalStream, string correctedText): Merges corrected text into the DOCX.
+ *   This method now updates the first run of each paragraph (to preserve formatting) and removes extra runs.
  * - ExtractBody(WordprocessingDocument doc): Extracts the main document body.
  * - ExtractHeaders(WordprocessingDocument doc): Extracts header parts from the document.
  * - ExtractFooters(WordprocessingDocument doc): Extracts footer parts from the document.
@@ -18,8 +19,13 @@
  * - DocumentFormat.OpenXml.Wordprocessing: For accessing document elements like Body, Header, Footer, and Styles.
  *
  * @notes
- * - The current implementation uses a simple line-based merge strategy in MergeDocument.
- * - Future enhancements may include more sophisticated merging and error handling.
+ * - The merging strategy is based on splitting the corrected text into paragraphs (using newline delimiters)
+ *   and updating each corresponding paragraph in the original document.
+ * - If a paragraph exists in the original document, only its first run is updated (to preserve formatting)
+ *   while any additional runs are removed.
+ * - Extra paragraphs in the corrected text are appended as new paragraphs.
+ * - This implementation assumes that a one-to-one mapping exists between the corrected text paragraphs and
+ *   the original document paragraphs for the overlapping sections.
  */
 
 using System;
@@ -51,12 +57,14 @@ namespace DocxMergeService.Services
 
         /// <summary>
         /// Merges the corrected text into the DOCX document.
-        /// It replaces existing paragraph content with the corrected text while preserving the basic formatting.
-        /// If the corrected text has more paragraphs than the original document, extra paragraphs are appended.
+        /// It updates the existing paragraphs by modifying the text in the first run of each paragraph
+        /// (preserving run formatting) and removes extra runs. If the corrected text contains more paragraphs
+        /// than the original, extra paragraphs are appended.
         /// </summary>
         /// <param name="originalStream">The MemoryStream containing the original DOCX file.</param>
         /// <param name="correctedText">The corrected text to merge into the document.</param>
         /// <returns>A new MemoryStream containing the merged DOCX file.</returns>
+        /// <exception cref="ArgumentNullException">Thrown if originalStream or correctedText is null.</exception>
         /// <exception cref="Exception">Throws an exception if the DOCX structure is invalid.</exception>
         public MemoryStream MergeDocument(MemoryStream originalStream, string correctedText)
         {
@@ -65,42 +73,60 @@ namespace DocxMergeService.Services
             if (correctedText == null)
                 throw new ArgumentNullException(nameof(correctedText), "Corrected text cannot be null.");
 
-            // Reset the stream position to ensure proper reading
+            // Reset the stream position to ensure proper reading.
             originalStream.Position = 0;
             using (var wordDoc = OpenDocument(originalStream))
             {
-                // Retrieve the document body
+                // Retrieve the document body.
                 var body = wordDoc.MainDocumentPart?.Document?.Body;
                 if (body == null)
                 {
                     throw new Exception("Invalid DOCX structure: Missing document body.");
                 }
 
-                // Split the corrected text into paragraphs based on newline characters.
+                // Split the corrected text into paragraphs using newline delimiters.
                 var correctedParagraphs = correctedText.Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.None);
                 var originalParagraphs = body.Elements<Paragraph>().ToList();
 
-                // Determine the number of paragraphs to update (minimum of both counts)
+                // Determine the number of paragraphs to update (minimum of both counts).
                 int minCount = Math.Min(originalParagraphs.Count, correctedParagraphs.Length);
 
                 // Update existing paragraphs with corrected text.
                 for (int i = 0; i < minCount; i++)
                 {
-                    // Remove all existing runs in the paragraph to replace the text.
-                    originalParagraphs[i].RemoveAllChildren<Run>();
+                    string newParaText = correctedParagraphs[i];
 
-                    // Create a new run with the corrected paragraph text.
-                    Run newRun = new Run(new Text(correctedParagraphs[i])
+                    // Get the current paragraph.
+                    var para = originalParagraphs[i];
+
+                    // Get all runs in the paragraph.
+                    var runs = para.Elements<Run>().ToList();
+
+                    if (runs.Any())
                     {
-                        // Ensure spaces are preserved
-                        Space = new EnumValue<SpaceProcessingModeValues>(SpaceProcessingModeValues.Preserve)
-                    });
+                        // Update the first run's text with the new paragraph text.
+                        UpdateRunText(runs.First(), newParaText);
 
-                    // Append the new run to the paragraph.
-                    originalParagraphs[i].Append(newRun);
+                        // Remove any additional runs to prevent duplicate or conflicting formatting.
+                        foreach (var extraRun in runs.Skip(1).ToList())
+                        {
+                            extraRun.Remove();
+                        }
+                    }
+                    else
+                    {
+                        // If no run exists, create a new run with the corrected text.
+                        Run newRun = new Run(new Text(newParaText)
+                        {
+                            // Preserve spaces if needed.
+                            Space = new EnumValue<SpaceProcessingModeValues>(SpaceProcessingModeValues.Preserve)
+                        });
+                        para.Append(newRun);
+                    }
                 }
 
-                // If the corrected text contains more paragraphs, append them.
+                // If the corrected text contains more paragraphs than the original,
+                // append new paragraphs for the extra lines.
                 for (int i = minCount; i < correctedParagraphs.Length; i++)
                 {
                     Paragraph extraParagraph = new Paragraph(
@@ -120,6 +146,36 @@ namespace DocxMergeService.Services
             MemoryStream mergedStream = new MemoryStream(originalStream.ToArray());
             mergedStream.Position = 0;
             return mergedStream;
+        }
+
+        /// <summary>
+        /// Updates the text of the provided Run element while preserving its formatting.
+        /// This method removes any existing Text children and adds a new one with the specified text.
+        /// </summary>
+        /// <param name="run">The Run element to update.</param>
+        /// <param name="newText">The new text to set in the run.</param>
+        private void UpdateRunText(Run run, string newText)
+        {
+            if (run == null)
+                throw new ArgumentNullException(nameof(run), "Run element cannot be null.");
+            if (newText == null)
+                throw new ArgumentNullException(nameof(newText), "New text cannot be null.");
+
+            // Remove all existing Text children in the run.
+            var texts = run.Elements<Text>().ToList();
+            foreach (var text in texts)
+            {
+                text.Remove();
+            }
+
+            // Create a new Text element with the new text and preserve spacing.
+            Text newTextElement = new Text(newText)
+            {
+                Space = new EnumValue<SpaceProcessingModeValues>(SpaceProcessingModeValues.Preserve)
+            };
+
+            // Append the new Text element to the run.
+            run.Append(newTextElement);
         }
 
         /// <summary>
