@@ -3,17 +3,21 @@
  * @description
  * This service class encapsulates operations on DOCX files using the Open XML SDK.
  * It provides methods to open a DOCX document from a stream, merge corrected text into the DOCX,
- * extract various document parts (body, headers, footers, styles), and now merge headers and footers.
+ * extract various document parts (body, headers, footers, styles), merge headers and footers,
+ * and now merge style definitions from multiple source documents into a target document.
  *
  * Key features:
  * - OpenDocument(Stream stream): Opens a DOCX file in read/write mode.
  * - MergeDocument(MemoryStream originalStream, string correctedText): Merges corrected text into the DOCX.
+ * - UpdateRunText(Run run, string newText): Updates the text of a Run element while preserving formatting.
  * - ExtractBody(WordprocessingDocument doc): Extracts the document body.
  * - ExtractHeaders(WordprocessingDocument doc): Extracts header parts.
  * - ExtractFooters(WordprocessingDocument doc): Extracts footer parts.
  * - ExtractStyles(WordprocessingDocument doc): Extracts styles definitions.
- * - MergeHeaders(WordprocessingDocument sourceDoc, WordprocessingDocument targetDoc): Merges header parts from a source document into a target document.
- * - MergeFooters(WordprocessingDocument sourceDoc, WordprocessingDocument targetDoc): Merges footer parts from a source document into a target document.
+ * - MergeHeaders(WordprocessingDocument sourceDoc, WordprocessingDocument targetDoc): Merges header parts.
+ * - MergeFooters(WordprocessingDocument sourceDoc, WordprocessingDocument targetDoc): Merges footer parts.
+ * - MergeStyles(WordprocessingDocument targetDoc, List<WordprocessingDocument> sourceDocs): Merges style definitions from multiple source documents
+ *   into the target document, renaming conflicting styles.
  *
  * @dependencies
  * - DocumentFormat.OpenXml.Packaging: For opening and saving DOCX files.
@@ -21,8 +25,10 @@
  *
  * @notes
  * - The merging strategy for headers and footers is simple: if a header/footer exists in the source document,
- *   the first one is copied to the target document, replacing any existing default header/footer in the target.
- * - In more complex scenarios (e.g., multiple sections or different header/footer types), further logic would be required.
+ *   the first one is copied to the target document, replacing any existing default header/footer.
+ * - In the MergeStyles method, if a style conflict is detected (i.e. same style id but different definition),
+ *   the conflicting style from the source is renamed by appending "_merged".
+ * - This is a simplified approach and does not update style references in the document content.
  */
 
 using System;
@@ -231,7 +237,7 @@ namespace DocxMergeService.Services
 
         /// <summary>
         /// Merges the header parts from the source document into the target document.
-        /// This method copies the first header found in the source document, creates a new header part in the target,
+        /// This method copies the first header from the source document, creates a new header part in the target,
         /// and updates the target document's section properties to reference the new header.
         /// </summary>
         /// <param name="sourceDoc">The source WordprocessingDocument containing the header to merge.</param>
@@ -289,7 +295,7 @@ namespace DocxMergeService.Services
 
         /// <summary>
         /// Merges the footer parts from the source document into the target document.
-        /// This method copies the first footer found in the source document, creates a new footer part in the target,
+        /// This method copies the first footer from the source document, creates a new footer part in the target,
         /// and updates the target document's section properties to reference the new footer.
         /// </summary>
         /// <param name="sourceDoc">The source WordprocessingDocument containing the footer to merge.</param>
@@ -343,6 +349,90 @@ namespace DocxMergeService.Services
 
             // Save changes to the target document.
             mainPart.Document.Save();
+        }
+
+        /// <summary>
+        /// Merges the style definitions from multiple source documents into the target document.
+        /// It extracts the styles from each source document and integrates them into the target's StyleDefinitionsPart.
+        /// If a style with the same style ID already exists in the target but with a different definition,
+        /// the source style is renamed by appending "_merged" to avoid conflicts.
+        /// 
+        /// <para>
+        /// This method assumes that the target document's StyleDefinitionsPart is either present or will be created.
+        /// </para>
+        /// </summary>
+        /// <param name="targetDoc">The target WordprocessingDocument to which styles will be merged.</param>
+        /// <param name="sourceDocs">A list of source WordprocessingDocuments whose styles are to be merged.</param>
+        public void MergeStyles(WordprocessingDocument targetDoc, List<WordprocessingDocument> sourceDocs)
+        {
+            if (targetDoc == null)
+                throw new ArgumentNullException(nameof(targetDoc), "Target document cannot be null.");
+            if (sourceDocs == null || sourceDocs.Count == 0)
+                throw new ArgumentException("No source documents provided for merging styles.", nameof(sourceDocs));
+
+            // Get or create the StyleDefinitionsPart for the target document.
+            var mainPart = targetDoc.MainDocumentPart;
+            if (mainPart == null)
+                throw new Exception("Target document is missing a MainDocumentPart.");
+
+            StyleDefinitionsPart targetStylesPart = mainPart.StyleDefinitionsPart;
+            if (targetStylesPart == null)
+            {
+                targetStylesPart = mainPart.AddNewPart<StyleDefinitionsPart>();
+                targetStylesPart.Styles = new Styles();
+                targetStylesPart.Styles.Save();
+            }
+
+            // Load the current styles in the target document.
+            var targetStyles = targetStylesPart.Styles.Elements<Style>().ToList();
+
+            // Iterate through each source document.
+            foreach (var sourceDoc in sourceDocs)
+            {
+                var sourceStyles = ExtractStyles(sourceDoc);
+                if (sourceStyles == null)
+                    continue;
+
+                foreach (var sourceStyle in sourceStyles.Elements<Style>())
+                {
+                    // Get the style ID.
+                    var styleId = sourceStyle.StyleId?.Value;
+                    if (string.IsNullOrEmpty(styleId))
+                        continue;
+
+                    // Check if this style already exists in the target.
+                    var existingStyle = targetStyles.FirstOrDefault(s => s.StyleId?.Value == styleId);
+                    if (existingStyle == null)
+                    {
+                        // Clone the source style and add it to the target.
+                        var clonedStyle = (Style)sourceStyle.CloneNode(true);
+                        targetStylesPart.Styles.AppendChild(clonedStyle);
+                        targetStyles.Add(clonedStyle);
+                    }
+                    else
+                    {
+                        // If the style exists, compare the definitions.
+                        if (existingStyle.OuterXml != sourceStyle.OuterXml)
+                        {
+                            // Conflict detected; rename the source style.
+                            var newStyleId = styleId + "_merged";
+                            // Clone the source style and update the style ID.
+                            var clonedStyle = (Style)sourceStyle.CloneNode(true);
+                            if (clonedStyle.StyleId != null)
+                            {
+                                clonedStyle.StyleId.Value = newStyleId;
+                            }
+                            // Optionally, update any style references within the cloned style (not implemented here).
+                            targetStylesPart.Styles.AppendChild(clonedStyle);
+                            targetStyles.Add(clonedStyle);
+                        }
+                        // If they are identical, do nothing.
+                    }
+                }
+            }
+
+            // Save the updated styles part.
+            targetStylesPart.Styles.Save();
         }
     }
 }
