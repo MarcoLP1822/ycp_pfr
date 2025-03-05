@@ -2,30 +2,27 @@
  * @file docx_merge_service/Services/DocxService.cs
  * @description
  * This service class encapsulates operations on DOCX files using the Open XML SDK.
- * It provides methods to open a DOCX document from a stream, merge corrected text into the document,
- * and extract various document parts such as the body, headers, footers, and styles.
+ * It provides methods to open a DOCX document from a stream, merge corrected text into the DOCX,
+ * extract various document parts (body, headers, footers, styles), and now merge headers and footers.
  *
  * Key features:
- * - OpenDocument(Stream stream): Opens a DOCX document in read/write mode.
+ * - OpenDocument(Stream stream): Opens a DOCX file in read/write mode.
  * - MergeDocument(MemoryStream originalStream, string correctedText): Merges corrected text into the DOCX.
- *   This method now updates the first run of each paragraph (to preserve formatting) and removes extra runs.
- * - ExtractBody(WordprocessingDocument doc): Extracts the main document body.
- * - ExtractHeaders(WordprocessingDocument doc): Extracts header parts from the document.
- * - ExtractFooters(WordprocessingDocument doc): Extracts footer parts from the document.
- * - ExtractStyles(WordprocessingDocument doc): Extracts the styles from the document.
+ * - ExtractBody(WordprocessingDocument doc): Extracts the document body.
+ * - ExtractHeaders(WordprocessingDocument doc): Extracts header parts.
+ * - ExtractFooters(WordprocessingDocument doc): Extracts footer parts.
+ * - ExtractStyles(WordprocessingDocument doc): Extracts styles definitions.
+ * - MergeHeaders(WordprocessingDocument sourceDoc, WordprocessingDocument targetDoc): Merges header parts from a source document into a target document.
+ * - MergeFooters(WordprocessingDocument sourceDoc, WordprocessingDocument targetDoc): Merges footer parts from a source document into a target document.
  *
  * @dependencies
  * - DocumentFormat.OpenXml.Packaging: For opening and saving DOCX files.
- * - DocumentFormat.OpenXml.Wordprocessing: For accessing document elements like Body, Header, Footer, and Styles.
+ * - DocumentFormat.OpenXml.Wordprocessing: For accessing and manipulating document elements.
  *
  * @notes
- * - The merging strategy is based on splitting the corrected text into paragraphs (using newline delimiters)
- *   and updating each corresponding paragraph in the original document.
- * - If a paragraph exists in the original document, only its first run is updated (to preserve formatting)
- *   while any additional runs are removed.
- * - Extra paragraphs in the corrected text are appended as new paragraphs.
- * - This implementation assumes that a one-to-one mapping exists between the corrected text paragraphs and
- *   the original document paragraphs for the overlapping sections.
+ * - The merging strategy for headers and footers is simple: if a header/footer exists in the source document,
+ *   the first one is copied to the target document, replacing any existing default header/footer in the target.
+ * - In more complex scenarios (e.g., multiple sections or different header/footer types), further logic would be required.
  */
 
 using System;
@@ -230,6 +227,122 @@ namespace DocxMergeService.Services
                 return null;
             }
             return stylesPart.Styles;
+        }
+
+        /// <summary>
+        /// Merges the header parts from the source document into the target document.
+        /// This method copies the first header found in the source document, creates a new header part in the target,
+        /// and updates the target document's section properties to reference the new header.
+        /// </summary>
+        /// <param name="sourceDoc">The source WordprocessingDocument containing the header to merge.</param>
+        /// <param name="targetDoc">The target WordprocessingDocument where the header should be merged.</param>
+        public void MergeHeaders(WordprocessingDocument sourceDoc, WordprocessingDocument targetDoc)
+        {
+            // Extract headers from the source document.
+            var sourceHeaders = ExtractHeaders(sourceDoc);
+            if (sourceHeaders.Count == 0)
+            {
+                // No header to merge; exit method.
+                return;
+            }
+
+            // For simplicity, take the first header from the source.
+            var firstHeader = sourceHeaders.First();
+
+            // Get the main document part of the target document.
+            var mainPart = targetDoc.MainDocumentPart;
+            if (mainPart == null)
+            {
+                throw new Exception("Target document is missing a MainDocumentPart.");
+            }
+
+            // Create a new header part in the target document and copy the content from the source header.
+            var newHeaderPart = mainPart.AddNewPart<HeaderPart>();
+            using (var headerStream = firstHeader.GetStream())
+            {
+                newHeaderPart.FeedData(headerStream);
+            }
+
+            // Create a header reference to attach to the section properties.
+            var headerReference = new HeaderReference()
+            {
+                Id = mainPart.GetIdOfPart(newHeaderPart),
+                Type = HeaderFooterValues.Default
+            };
+
+            // Get or create section properties in the target document.
+            var body = mainPart.Document.Body;
+            var sectPr = body.Elements<SectionProperties>().FirstOrDefault();
+            if (sectPr == null)
+            {
+                sectPr = new SectionProperties();
+                body.Append(sectPr);
+            }
+
+            // Remove any existing default header references and add the new one.
+            sectPr.RemoveAllChildren<HeaderReference>();
+            sectPr.Append(headerReference);
+
+            // Save changes to the target document.
+            mainPart.Document.Save();
+        }
+
+        /// <summary>
+        /// Merges the footer parts from the source document into the target document.
+        /// This method copies the first footer found in the source document, creates a new footer part in the target,
+        /// and updates the target document's section properties to reference the new footer.
+        /// </summary>
+        /// <param name="sourceDoc">The source WordprocessingDocument containing the footer to merge.</param>
+        /// <param name="targetDoc">The target WordprocessingDocument where the footer should be merged.</param>
+        public void MergeFooters(WordprocessingDocument sourceDoc, WordprocessingDocument targetDoc)
+        {
+            // Extract footers from the source document.
+            var sourceFooters = ExtractFooters(sourceDoc);
+            if (sourceFooters.Count == 0)
+            {
+                // No footer to merge; exit method.
+                return;
+            }
+
+            // For simplicity, take the first footer from the source.
+            var firstFooter = sourceFooters.First();
+
+            // Get the main document part of the target document.
+            var mainPart = targetDoc.MainDocumentPart;
+            if (mainPart == null)
+            {
+                throw new Exception("Target document is missing a MainDocumentPart.");
+            }
+
+            // Create a new footer part in the target document and copy the content from the source footer.
+            var newFooterPart = mainPart.AddNewPart<FooterPart>();
+            using (var footerStream = firstFooter.GetStream())
+            {
+                newFooterPart.FeedData(footerStream);
+            }
+
+            // Create a footer reference to attach to the section properties.
+            var footerReference = new FooterReference()
+            {
+                Id = mainPart.GetIdOfPart(newFooterPart),
+                Type = HeaderFooterValues.Default
+            };
+
+            // Get or create section properties in the target document.
+            var body = mainPart.Document.Body;
+            var sectPr = body.Elements<SectionProperties>().FirstOrDefault();
+            if (sectPr == null)
+            {
+                sectPr = new SectionProperties();
+                body.Append(sectPr);
+            }
+
+            // Remove any existing default footer references and add the new one.
+            sectPr.RemoveAllChildren<FooterReference>();
+            sectPr.Append(footerReference);
+
+            // Save changes to the target document.
+            mainPart.Document.Save();
         }
     }
 }

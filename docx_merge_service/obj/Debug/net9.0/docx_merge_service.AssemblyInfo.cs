@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("docx_merge_service")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+6e877c4f584a5c9105f010db8873ac2f1405fe91")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+58d1c3a8bda69f5dce1dafcf24adcd496afbc37a")]
 [assembly: System.Reflection.AssemblyProductAttribute("docx_merge_service")]
 [assembly: System.Reflection.AssemblyTitleAttribute("docx_merge_service")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
