@@ -24,9 +24,9 @@ import { createMocks } from 'node-mocks-http';
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 // Updated relative paths: two directories up to reach the pages folder.
-import uploadHandler from '../../pages/api/files/upload';
-import manageHandler from '../../pages/api/files/manage';
-import proofreadingProcessHandler from '../../pages/api/proofreading/process';
+import uploadHandler from '../../webapp/pages/api/files/upload';
+import manageHandler from '../../webapp/pages/api/files/manage';
+import proofreadingProcessHandler from '../../webapp/pages/api/proofreading/process';
 
 describe('Edge Case and Error Handling Tests', () => {
   // Test for the file upload endpoint when required fields are missing.

@@ -36,7 +36,7 @@ import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 
 import '../styles/global.css'; // Tailwind/global CSS if you still want it
-import theme from '../styles/theme'; // Custom Material UI theme
+import theme from '../../styles/theme'; // Custom Material UI theme
 import MainLayout from '../components/Layout/MainLayout';
 
 function MyApp({ Component, pageProps }: AppProps<{ initialSession: Session }>) {

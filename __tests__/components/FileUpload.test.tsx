@@ -15,7 +15,7 @@
 
 import * as React from 'react';
 import { render, screen } from '@testing-library/react';
-import FileUpload from '../../components/FileUpload';
+import FileUpload from '../../webapp/components/FileUpload';
 
 describe('FileUpload Component', () => {
   test('renders the upload heading', () => {

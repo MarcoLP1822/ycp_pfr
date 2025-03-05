@@ -18,7 +18,7 @@
 
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
-import VersionControlModal, { Version } from '../../components/VersionControlModal';
+import VersionControlModal, { Version } from '../../webapp/components/VersionControlModal';
 
 describe('VersionControlModal Component', () => {
   const mockVersions: Version[] = [

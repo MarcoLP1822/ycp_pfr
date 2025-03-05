@@ -28,7 +28,7 @@ if (typeof globalThis.fetch !== 'function') {
   
   import { createMocks } from 'node-mocks-http';
   import type { NextApiRequest, NextApiResponse } from 'next';
-  import handler from '../../pages/api/proofreading/merge-docx';
+  import handler from '../../webapp/pages/api/proofreading/merge-docx';
   
   // --- Mocks per drizzleClient ---
   jest.mock('../../services/drizzleClient', () => {

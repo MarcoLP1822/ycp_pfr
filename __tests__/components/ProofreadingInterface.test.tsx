@@ -16,7 +16,7 @@
 
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
-import ProofreadingInterface, { ProofreadingInterfaceProps } from '../../components/ProofreadingInterface';
+import ProofreadingInterface, { ProofreadingInterfaceProps } from '../../webapp/components/ProofreadingInterface';
 
 describe('ProofreadingInterface Component', () => {
   const dummyOriginalText = "This is the original text.";
