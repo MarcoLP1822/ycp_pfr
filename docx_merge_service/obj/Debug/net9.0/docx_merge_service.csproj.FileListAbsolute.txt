@@ -34,3 +34,5 @@ C:\Users\Youcanprint1\Desktop\AI\ycp_pfr\docx_merge_service\obj\Debug\net9.0\ref
 C:\Users\Youcanprint1\Desktop\AI\ycp_pfr\docx_merge_service\obj\Debug\net9.0\docx_merge_service.pdb
 C:\Users\Youcanprint1\Desktop\AI\ycp_pfr\docx_merge_service\obj\Debug\net9.0\docx_merge_service.genruntimeconfig.cache
 C:\Users\Youcanprint1\Desktop\AI\ycp_pfr\docx_merge_service\obj\Debug\net9.0\ref\docx_merge_service.dll
+C:\Users\Youcanprint1\Desktop\AI\ycp_pfr\docx_merge_service\bin\Debug\net9.0\DiffMatchPatch.dll
+C:\Users\Youcanprint1\Desktop\AI\ycp_pfr\docx_merge_service\bin\Debug\net9.0\DocumentFormat.OpenXml.Framework.dll

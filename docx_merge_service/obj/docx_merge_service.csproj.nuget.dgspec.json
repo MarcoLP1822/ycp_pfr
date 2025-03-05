@@ -44,13 +44,17 @@
         "net9.0": {
           "targetAlias": "net9.0",
           "dependencies": {
+            "DiffMatchPatch": {
+              "target": "Package",
+              "version": "[4.0.0, )"
+            },
             "DocumentFormat.OpenXml": {
               "target": "Package",
-              "version": "[2.19.0, )"
+              "version": "[3.2.0, )"
             },
             "Swashbuckle.AspNetCore": {
               "target": "Package",
-              "version": "[6.5.0, )"
+              "version": "[7.3.1, )"
             }
           },
           "imports": [
