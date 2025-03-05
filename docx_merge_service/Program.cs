@@ -1,9 +1,31 @@
+/**
+ * @file Program.cs
+ * @description
+ * This file sets up the ASP.NET Core application.
+ * In this update, I added the registration for DocxService in the DI container
+ * so that it can be injected into controllers (e.g., MergeController).
+ *
+ * Key features:
+ * - Registers controllers, Swagger, and DocxService.
+ * - Configures middleware for HTTPS redirection and Swagger UI.
+ *
+ * @dependencies
+ * - Microsoft.AspNetCore.Builder: For building the app.
+ * - Microsoft.Extensions.DependencyInjection: For dependency injection.
+ * - DocxMergeService.Services.DocxService: Registered for use in controllers.
+ *
+ * @notes
+ * - Ensure that any new services are also added to the DI container here.
+ */
+
 using Microsoft.OpenApi.Models;
+using DocxMergeService.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Aggiunge i servizi necessari al container
+// Add services to the container.
 builder.Services.AddControllers();
+builder.Services.AddScoped<DocxService>(); // Register DocxService for DI
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -12,7 +34,7 @@ builder.Services.AddSwaggerGen(c =>
 
 var app = builder.Build();
 
-// Configura il middleware per lo sviluppo
+// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -23,9 +45,6 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-
 app.UseAuthorization();
-
 app.MapControllers();
-
 app.Run();

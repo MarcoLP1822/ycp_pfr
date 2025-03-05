@@ -2,23 +2,24 @@
  * @file docx_merge_service/Services/DocxService.cs
  * @description
  * This service class encapsulates operations on DOCX files using the Open XML SDK.
- * It provides methods to open a DOCX document from a stream and to merge corrected text
- * into the document, replacing or appending paragraphs while preserving the basic formatting.
- * 
+ * It provides methods to open a DOCX document from a stream, merge corrected text into the document,
+ * and extract various document parts such as the body, headers, footers, and styles.
+ *
  * Key features:
  * - OpenDocument(Stream stream): Opens a DOCX document in read/write mode.
  * - MergeDocument(MemoryStream originalStream, string correctedText): Merges corrected text into the DOCX.
- *   It replaces the text in existing paragraphs and appends new paragraphs if the corrected text
- *   contains more lines than the original document.
- * 
+ * - ExtractBody(WordprocessingDocument doc): Extracts the main document body.
+ * - ExtractHeaders(WordprocessingDocument doc): Extracts header parts from the document.
+ * - ExtractFooters(WordprocessingDocument doc): Extracts footer parts from the document.
+ * - ExtractStyles(WordprocessingDocument doc): Extracts the styles from the document.
+ *
  * @dependencies
  * - DocumentFormat.OpenXml.Packaging: For opening and saving DOCX files.
- * - DocumentFormat.OpenXml.Wordprocessing: For manipulating document elements like Paragraph and Run.
- * 
+ * - DocumentFormat.OpenXml.Wordprocessing: For accessing document elements like Body, Header, Footer, and Styles.
+ *
  * @notes
- * - This implementation assumes that the DOCX file has a valid MainDocumentPart and Body.
- * - It uses a simple line-based merge strategy (splitting the corrected text by newline characters).
- * - Advanced merging (e.g., preserving detailed run formatting or merging headers/footers) can be added later.
+ * - The current implementation uses a simple line-based merge strategy in MergeDocument.
+ * - Future enhancements may include more sophisticated merging and error handling.
  */
 
 using System;
@@ -44,7 +45,7 @@ namespace DocxMergeService.Services
             if (stream == null)
                 throw new ArgumentNullException(nameof(stream), "Input stream cannot be null.");
 
-            // Open the DOCX file in read/write mode (true)
+            // Open the DOCX file in read/write mode.
             return WordprocessingDocument.Open(stream, true);
         }
 
@@ -119,6 +120,60 @@ namespace DocxMergeService.Services
             MemoryStream mergedStream = new MemoryStream(originalStream.ToArray());
             mergedStream.Position = 0;
             return mergedStream;
+        }
+
+        /// <summary>
+        /// Extracts the main document body from the given WordprocessingDocument.
+        /// </summary>
+        /// <param name="doc">The WordprocessingDocument instance.</param>
+        /// <returns>The Body element of the document.</returns>
+        /// <exception cref="Exception">Throws an exception if the document body is missing.</exception>
+        public Body ExtractBody(WordprocessingDocument doc)
+        {
+            var body = doc.MainDocumentPart?.Document?.Body;
+            if (body == null)
+            {
+                throw new Exception("The DOCX document does not contain a valid body.");
+            }
+            return body;
+        }
+
+        /// <summary>
+        /// Extracts all header parts from the given WordprocessingDocument.
+        /// </summary>
+        /// <param name="doc">The WordprocessingDocument instance.</param>
+        /// <returns>A list of HeaderPart objects. If none are found, returns an empty list.</returns>
+        public List<HeaderPart> ExtractHeaders(WordprocessingDocument doc)
+        {
+            var headers = doc.MainDocumentPart?.HeaderParts;
+            return headers != null ? headers.ToList() : new List<HeaderPart>();
+        }
+
+        /// <summary>
+        /// Extracts all footer parts from the given WordprocessingDocument.
+        /// </summary>
+        /// <param name="doc">The WordprocessingDocument instance.</param>
+        /// <returns>A list of FooterPart objects. If none are found, returns an empty list.</returns>
+        public List<FooterPart> ExtractFooters(WordprocessingDocument doc)
+        {
+            var footers = doc.MainDocumentPart?.FooterParts;
+            return footers != null ? footers.ToList() : new List<FooterPart>();
+        }
+
+        /// <summary>
+        /// Extracts the styles from the given WordprocessingDocument.
+        /// </summary>
+        /// <param name="doc">The WordprocessingDocument instance.</param>
+        /// <returns>The Styles object containing style definitions, or null if no styles are found.</returns>
+        public Styles ExtractStyles(WordprocessingDocument doc)
+        {
+            var stylesPart = doc.MainDocumentPart?.StyleDefinitionsPart;
+            if (stylesPart == null)
+            {
+                // Return null or you might choose to throw an exception based on your error handling strategy.
+                return null;
+            }
+            return stylesPart.Styles;
         }
     }
 }
