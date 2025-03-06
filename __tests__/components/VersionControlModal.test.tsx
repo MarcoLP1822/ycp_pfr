@@ -1,25 +1,24 @@
 /**
- * @file __tests__/components/VersionControlModal.test.tsx
+ * @file __tests__/components/VersionControlModal.test.ts
  * @description
- * This file contains tests for the VersionControlModal component.
- * It ensures that:
- * - The modal renders correctly when the `isOpen` prop is true.
- * - Version details are displayed.
- * - The close button triggers the onClose callback.
- * - The rollback buttons trigger their respective callbacks.
- * 
+ * Questo file contiene test per il componente VersionControlModal.
+ * Verifica che:
+ * - Il modal venga renderizzato correttamente quando la proprietà `isOpen` è true.
+ * - I dettagli delle versioni vengano visualizzati.
+ * - Il pulsante di chiusura richiami la callback onClose.
+ * - I pulsanti di rollback richiamino le callback corrispondenti.
+ *
  * Key features:
- * - Verifies the presence of version numbers and modal title.
- * - Simulates user clicks on action buttons and checks callback invocations.
- * - Confirms that the modal does not render when `isOpen` is false.
- * 
+ * - Usa React Testing Library per renderizzare il componente.
+ * - Simula interazioni utente con i pulsanti.
+ *
  * @dependencies
- * - React Testing Library for rendering, querying, and simulating user events.
+ * - React Testing Library per rendering, querying e simulazione degli eventi.
  */
 
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
-import VersionControlModal, { Version } from '../../components/VersionControlModal';
+import VersionControlModal, { Version } from '../../webapp/components/VersionControlModal';
 
 describe('VersionControlModal Component', () => {
   const mockVersions: Version[] = [
@@ -42,11 +41,11 @@ describe('VersionControlModal Component', () => {
       />
     );
     
-    // Check that the modal title is rendered.
+    // Verifica che il titolo della modale venga renderizzato
     const title = screen.getByText(/version history/i);
     expect(title).toBeInTheDocument();
 
-    // Check that the version numbers are rendered.
+    // Verifica che i numeri delle versioni vengano visualizzati
     const version1 = screen.getByText('1');
     expect(version1).toBeInTheDocument();
 
@@ -65,8 +64,8 @@ describe('VersionControlModal Component', () => {
       />
     );
     
-    // Find the close button by its aria-label and click it.
-    const closeButton = screen.getByRole('button', { name: /close version history modal/i });
+    // Trova il pulsante "Close" e cliccalo
+    const closeButton = screen.getByRole('button', { name: /^Close$/i });
     fireEvent.click(closeButton);
     expect(onCloseMock).toHaveBeenCalled();
   });
@@ -82,8 +81,8 @@ describe('VersionControlModal Component', () => {
       />
     );
     
-    // Retrieve all rollback buttons and click the first one.
-    const rollbackButtons = screen.getAllByRole('button', { name: /rollback to version/i });
+    // Recupera tutti i pulsanti "Rollback" (quelli nelle righe della tabella)
+    const rollbackButtons = screen.getAllByRole('button', { name: /^Rollback$/i });
     fireEvent.click(rollbackButtons[0]);
     expect(onRollbackVersionMock).toHaveBeenCalledWith(mockVersions[0].id);
   });
@@ -99,8 +98,8 @@ describe('VersionControlModal Component', () => {
       />
     );
     
-    // Find the "Rollback to Original" button and click it.
-    const rollbackOriginalButton = screen.getByRole('button', { name: /rollback to original text/i });
+    // Trova il pulsante "Rollback to Original" e cliccalo.
+    const rollbackOriginalButton = screen.getByRole('button', { name: /^Rollback to Original$/i });
     fireEvent.click(rollbackOriginalButton);
     expect(onRollbackOriginalMock).toHaveBeenCalled();
   });
@@ -116,7 +115,7 @@ describe('VersionControlModal Component', () => {
       />
     );
     
-    // Ensure the modal is not rendered when isOpen is false.
+    // Verifica che la modale non sia renderizzata quando isOpen è false.
     expect(container.firstChild).toBeNull();
   });
 });
