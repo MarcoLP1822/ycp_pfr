@@ -1,43 +1,36 @@
 /**
  * @file pages/proofreading/[fileId].tsx
  * @description
- * This dynamic page allows the user to view and interact with the proofreading interface for a specific file.
- * It displays the original text and the corrected text (with inline highlights), along with version information.
- * 
- * Enhancements in this update:
- * - Added an "Edit Corrected Text" button that toggles between read-only and edit mode.
- * - Added a new "Download Complex DOCX" button which calls the external merge endpoint (/api/proofreading/merge-docx)
- *   to download a DOCX that preserves complex formatting.
- * - The "Download Complex DOCX" button uses proper loading states and displays error messages if the merge fails.
- * 
- * Key features:
- * - Fetch proofreading details (original text, corrected text, version number) from the backend.
- * - Toggle edit mode to allow the user to modify the plain text.
- * - Trigger download of both basic and complex DOCX versions.
- * 
+ * Questa pagina dinamica permette all'utente di visualizzare e interagire con l'interfaccia di proofreading per un file specifico.
+ * Mostra il testo originale e quello corretto (con le revisioni evidenziate) e permette di scaricare il file DOCX corretto.
+ *
+ * Modifica:
+ * - Il pulsante "Download DOCX" ora invia una richiesta POST all'endpoint "/api/proofreading/merge-docx" 
+ *   che a sua volta chiama il microservizio .NET per generare il file DOCX con la formattazione originale e le revisioni.
+ *
  * @dependencies
- * - React: For state management and rendering.
- * - Next.js Router: For dynamic routing.
- * - Material UI: For UI components.
- * 
+ * - React per la gestione dello stato e del rendering.
+ * - Next.js Router per la gestione delle rotte dinamiche.
+ * - Material UI per i componenti UI.
+ * - CorrectionControls per l'accettazione delle correzioni.
+ *
  * @notes
- * - The helper function `stripHtml` is used to remove any HTML tags from the corrected text before sending to the merge endpoint.
- * - Error handling is implemented to alert the user in case the external merge service fails.
+ * - La funzione stripHtml rimuove eventuali tag HTML dal testo corretto prima di inviarlo al microservizio.
+ * - La gestione del download utilizza un blob per forzare il salvataggio del file DOCX.
  */
-
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { Container, Typography, Box, Button, Alert } from '@mui/material';
 import { highlightDifferences } from '../../services/diffHighlighter';
 
-interface ProofreadingData {
+export interface ProofreadingData {
   originalText: string;
   correctedText: string;
   versionNumber?: number;
 }
 
-// Helper function to strip HTML tags (specifically <mark> tags) from a string
+// Helper function to strip HTML tags from a string.
 const stripHtml = (html: string): string => {
   const div = document.createElement('div');
   div.innerHTML = html;
@@ -55,14 +48,12 @@ const ProofreadingInterfacePage: React.FC = () => {
   const [editMode, setEditMode] = useState<boolean>(false);
   // editedText holds the plain text version for editing.
   const [editedText, setEditedText] = useState<string>('');
-
-  // State for complex DOCX download loading and errors
-  const [downloadComplexLoading, setDownloadComplexLoading] = useState<boolean>(false);
-  const [downloadComplexError, setDownloadComplexError] = useState<string>('');
+  // State per la gestione del download
+  const [downloadLoading, setDownloadLoading] = useState<boolean>(false);
+  const [downloadError, setDownloadError] = useState<string>('');
 
   useEffect(() => {
     if (!fileId) return;
-
     const fetchProofreadingData = async () => {
       try {
         const response = await fetch(`/api/proofreading/details?fileId=${fileId}`);
@@ -72,7 +63,6 @@ const ProofreadingInterfacePage: React.FC = () => {
         }
         const result = await response.json();
         setData(result);
-        // Initialize editedText with plain text version (stripping HTML)
         setEditedText(stripHtml(result.correctedText));
         setLoading(false);
       } catch (err: any) {
@@ -80,51 +70,38 @@ const ProofreadingInterfacePage: React.FC = () => {
         setLoading(false);
       }
     };
-
     fetchProofreadingData();
   }, [fileId]);
 
   const toggleEditMode = () => {
     if (editMode && data) {
-      // When saving changes, reapply diff highlighting to get highlighted corrected text.
       const newHighlighted = highlightDifferences(data.originalText, editedText);
       setData({ ...data, correctedText: newHighlighted });
     }
     setEditMode((prev) => !prev);
   };
 
-  // Handler to trigger basic DOCX download using the existing endpoint.
-  const handleDownload = () => {
-    if (!fileId || typeof fileId !== 'string') return;
-    window.open(`/api/proofreading/download?fileId=${fileId}`, '_blank');
-  };
-
-  // Handler to trigger complex DOCX download using the external merge service.
-  const handleDownloadComplexDocx = async () => {
+  // Handler per scaricare il file DOCX tramite il microservizio.
+  const handleDownload = async () => {
     if (!fileId || typeof fileId !== 'string' || !data) return;
-    setDownloadComplexLoading(true);
-    setDownloadComplexError('');
+    setDownloadLoading(true);
+    setDownloadError('');
     try {
-      // Use the helper function stripHtml to get plain corrected text.
       const plainCorrectedText = stripHtml(data.correctedText);
       const response = await fetch('/api/proofreading/merge-docx', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ file_id: fileId, correctedText: plainCorrectedText }),
+        body: JSON.stringify({ file_id: fileId, correctedText: plainCorrectedText })
       });
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to merge DOCX.');
       }
-      // The response is a binary stream (Buffer) so we convert it to a blob.
       const blob = await response.blob();
-      // Create a URL for the blob and trigger a download.
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
-      // The filename is determined by the Content-Disposition header from the response.
-      // If not available, fallback to a default name.
       const contentDisposition = response.headers.get('Content-Disposition');
-      let filename = 'proofread-complex.docx';
+      let filename = 'proofread.docx';
       if (contentDisposition) {
         const match = contentDisposition.match(/filename="?([^"]+)"?/);
         if (match && match[1]) {
@@ -138,10 +115,33 @@ const ProofreadingInterfacePage: React.FC = () => {
       a.remove();
       window.URL.revokeObjectURL(url);
     } catch (err: any) {
-      setDownloadComplexError(err.message || 'Error downloading complex DOCX.');
+      setDownloadError(err.message || 'Error downloading DOCX.');
     } finally {
-      setDownloadComplexLoading(false);
+      setDownloadLoading(false);
     }
+  };
+
+  // Handler per avviare il processo di proofreading (ri-esegue il processo AI).
+  const handleProofread = async (fileId: string) => {
+    try {
+      const response = await fetch('/api/proofreading/process', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ file_id: fileId }),
+      });
+      if (!response.ok) {
+        console.error('Proofreading process failed:', response.statusText);
+        return;
+      }
+      router.push(`/proofreading/${fileId}`);
+    } catch (error) {
+      console.error('Error triggering proofreading process:', error);
+    }
+  };
+
+  // Handler per visualizzare la cronologia delle versioni.
+  const handleViewVersions = async (fileId: string) => {
+    // Implementazione esistente...
   };
 
   if (loading) {
@@ -169,7 +169,6 @@ const ProofreadingInterfacePage: React.FC = () => {
         <Typography>File ID: {fileId}</Typography>
         {data?.versionNumber && <Typography>Current Version: {data.versionNumber}</Typography>}
       </Box>
-
       <Link
         href="/dashboard"
         style={{
@@ -181,7 +180,6 @@ const ProofreadingInterfacePage: React.FC = () => {
       >
         Back to Dashboard
       </Link>
-
       <div
         style={{
           display: 'grid',
@@ -199,12 +197,10 @@ const ProofreadingInterfacePage: React.FC = () => {
             value={data?.originalText || ''}
           />
         </div>
-
         {/* Corrected Text Panel */}
         <div style={{ border: '1px solid #ccc', padding: '1rem' }}>
           <Typography variant="h6">Corrected Text</Typography>
           {editMode ? (
-            // Editable plain text (no <mark> tags)
             <textarea
               style={{
                 width: '100%',
@@ -217,7 +213,6 @@ const ProofreadingInterfacePage: React.FC = () => {
               onChange={(e) => setEditedText(e.target.value)}
             />
           ) : (
-            // Read-only with inline highlights
             <div
               style={{
                 width: '100%',
@@ -244,7 +239,7 @@ const ProofreadingInterfacePage: React.FC = () => {
               {editMode ? 'Save Changes' : 'Edit Corrected Text'}
             </Button>
             <Button
-              onClick={handleDownload}
+              onClick={handleProofread.bind(null, fileId as string)}
               style={{
                 padding: '0.5rem 1rem',
                 backgroundColor: '#388e3c',
@@ -254,26 +249,26 @@ const ProofreadingInterfacePage: React.FC = () => {
                 cursor: 'pointer',
               }}
             >
-              Download DOCX
+              Re-proofread
             </Button>
             <Button
-              onClick={handleDownloadComplexDocx}
+              onClick={handleDownload}
               style={{
                 padding: '0.5rem 1rem',
-                backgroundColor: downloadComplexLoading ? '#ccc' : '#5e35b1',
+                backgroundColor: downloadLoading ? '#ccc' : '#5e35b1',
                 color: '#fff',
                 border: 'none',
                 borderRadius: '4px',
-                cursor: downloadComplexLoading ? 'not-allowed' : 'pointer',
+                cursor: downloadLoading ? 'not-allowed' : 'pointer',
               }}
-              disabled={downloadComplexLoading}
+              disabled={downloadLoading}
             >
-              {downloadComplexLoading ? 'Downloading...' : 'Download Complex DOCX'}
+              {downloadLoading ? 'Downloading...' : 'Download DOCX'}
             </Button>
           </div>
-          {downloadComplexError && (
+          {downloadError && (
             <Box mt={2}>
-              <Alert severity="error">{downloadComplexError}</Alert>
+              <Alert severity="error">{downloadError}</Alert>
             </Box>
           )}
         </div>
