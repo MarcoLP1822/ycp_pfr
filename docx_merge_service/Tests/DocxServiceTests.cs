@@ -8,36 +8,38 @@
  * - Extracting the document body.
  * - Merging header parts and footer parts.
  * - Merging styles from multiple documents with conflict resolution.
- * 
+ *
  * Key features:
- * - Validates input parameters (e.g., null streams) and expects exceptions.
+ * - Validates input parameters and expects exceptions.
  * - Uses in-memory DOCX creation for testing.
  * - Verifies that text merging replaces and appends paragraphs appropriately.
- * 
+ *
  * @dependencies
- * - xUnit for unit testing.
- * - DocumentFormat.OpenXml for DOCX manipulation.
- * - DocxMergeService.Services for the DocxService.
- * 
+ * - xUnit: For unit testing.
+ * - DocumentFormat.OpenXml: For DOCX manipulation.
+ * - DocxMergeService.Services: For the DocxService.
+ * - Microsoft.Extensions.Logging.Abstractions: To supply a dummy logger.
+ *
  * @notes
- * - This file assumes that the Open XML SDK is referenced.
- * - Helper functions are provided to generate simple DOCX documents in memory.
+ * - Uses NullLogger to satisfy the logger dependency.
+ * - All tests are run in the separate test project (docx_merge_service.Tests.csproj).
  */
 
 using System;
 using System.IO;
 using System.Linq;
-using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Wordprocessing;
 using DocxMergeService.Services;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace DocxMergeService.Tests
 {
     public class DocxServiceTests
     {
-        private readonly DocxService _docxService = new DocxService();
+        // Use a dummy logger from NullLogger to satisfy the dependency
+        private readonly DocxService _docxService = new DocxService(NullLogger<DocxService>.Instance);
 
         /// <summary>
         /// Helper method to create a simple DOCX document in memory with a single paragraph.
@@ -49,12 +51,12 @@ namespace DocxMergeService.Tests
             MemoryStream memStream = new MemoryStream();
             using (WordprocessingDocument wordDoc = WordprocessingDocument.Create(memStream, WordprocessingDocumentType.Document, true))
             {
-                MainDocumentPart mainPart = wordDoc.AddMainDocumentPart();
+                var mainPart = wordDoc.AddMainDocumentPart();
                 mainPart.Document = new Document();
-                Body body = new Body();
-                Paragraph para = new Paragraph(new Run(new Text(paragraphText)
+                var body = new Body();
+                var para = new Paragraph(new Run(new Text(paragraphText)
                 {
-                    Space = SpaceProcessingModeValues.Preserve
+                    Space = DocumentFormat.OpenXml.SpaceProcessingModeValues.Preserve
                 }));
                 body.Append(para);
                 mainPart.Document.Append(body);
@@ -69,7 +71,7 @@ namespace DocxMergeService.Tests
         public void OpenDocument_NullStream_ThrowsArgumentNullException()
         {
             // Test that passing a null stream to OpenDocument throws an ArgumentNullException.
-            Assert.Throws<ArgumentNullException>(() => _docxService.OpenDocument(null));
+            Assert.Throws<ArgumentNullException>(() => _docxService.LoadDocument(null));
         }
 
         [Fact]
@@ -78,7 +80,7 @@ namespace DocxMergeService.Tests
             // Create a simple DOCX document and open it using DocxService.
             using (MemoryStream ms = CreateSimpleDocx("Hello"))
             {
-                using (WordprocessingDocument doc = _docxService.OpenDocument(ms))
+                using (var doc = _docxService.LoadDocument(ms))
                 {
                     Assert.NotNull(doc);
                     Assert.NotNull(doc.MainDocumentPart);
@@ -98,7 +100,7 @@ namespace DocxMergeService.Tests
                 // Call MergeDocument to merge in the corrected text.
                 MemoryStream mergedStream = _docxService.MergeDocument(ms, correctedText);
                 mergedStream.Position = 0;
-                using (WordprocessingDocument mergedDoc = WordprocessingDocument.Open(mergedStream, false))
+                using (var mergedDoc = WordprocessingDocument.Open(mergedStream, false))
                 {
                     Body body = mergedDoc.MainDocumentPart.Document.Body;
                     var paragraphs = body.Elements<Paragraph>().ToList();
@@ -122,7 +124,7 @@ namespace DocxMergeService.Tests
             // Create a simple DOCX and test that ExtractBody returns its body.
             using (MemoryStream ms = CreateSimpleDocx("Test Body"))
             {
-                using (WordprocessingDocument doc = _docxService.OpenDocument(ms))
+                using (var doc = _docxService.LoadDocument(ms))
                 {
                     Body body = _docxService.ExtractBody(doc);
                     Assert.NotNull(body);
@@ -140,19 +142,19 @@ namespace DocxMergeService.Tests
             MemoryStream targetStream = new MemoryStream();
 
             // Create source document with header.
-            using (WordprocessingDocument sourceDoc = WordprocessingDocument.Create(sourceStream, WordprocessingDocumentType.Document, true))
+            using (var sourceDoc = WordprocessingDocument.Create(sourceStream, WordprocessingDocumentType.Document, true))
             {
-                MainDocumentPart mainPart = sourceDoc.AddMainDocumentPart();
+                var mainPart = sourceDoc.AddMainDocumentPart();
                 mainPart.Document = new Document(new Body(new Paragraph(new Run(new Text("Source Body")))));
-                HeaderPart headerPart = mainPart.AddNewPart<HeaderPart>();
+                var headerPart = mainPart.AddNewPart<HeaderPart>();
                 // Create a simple header with text.
-                Header header = new Header(new Paragraph(new Run(new Text("Header Content"))));
+                var header = new Header(new Paragraph(new Run(new Text("Header Content"))));
                 headerPart.Header = header;
                 headerPart.Header.Save();
 
                 // Associate the header with section properties.
-                SectionProperties sectPr = new SectionProperties();
-                HeaderReference headerRef = new HeaderReference() { Id = mainPart.GetIdOfPart(headerPart), Type = HeaderFooterValues.Default };
+                var sectPr = new SectionProperties();
+                var headerRef = new HeaderReference() { Id = mainPart.GetIdOfPart(headerPart), Type = HeaderFooterValues.Default };
                 sectPr.Append(headerRef);
                 mainPart.Document.Body.Append(sectPr);
                 mainPart.Document.Save();
@@ -160,14 +162,14 @@ namespace DocxMergeService.Tests
             sourceStream.Position = 0;
 
             // Create target document without a header.
-            using (WordprocessingDocument targetDoc = WordprocessingDocument.Create(targetStream, WordprocessingDocumentType.Document, true))
+            using (var targetDoc = WordprocessingDocument.Create(targetStream, WordprocessingDocumentType.Document, true))
             {
-                MainDocumentPart targetMainPart = targetDoc.AddMainDocumentPart();
+                var targetMainPart = targetDoc.AddMainDocumentPart();
                 targetMainPart.Document = new Document(new Body(new Paragraph(new Run(new Text("Target Body")))));
                 targetMainPart.Document.Save();
 
                 // Perform header merge from source to target.
-                using (WordprocessingDocument sourceDoc = WordprocessingDocument.Open(sourceStream, false))
+                using (var sourceDoc = WordprocessingDocument.Open(sourceStream, false))
                 {
                     _docxService.MergeHeaders(sourceDoc, targetDoc);
                 }
@@ -191,19 +193,19 @@ namespace DocxMergeService.Tests
             MemoryStream targetStream = new MemoryStream();
 
             // Create source document with footer.
-            using (WordprocessingDocument sourceDoc = WordprocessingDocument.Create(sourceStream, WordprocessingDocumentType.Document, true))
+            using (var sourceDoc = WordprocessingDocument.Create(sourceStream, WordprocessingDocumentType.Document, true))
             {
-                MainDocumentPart mainPart = sourceDoc.AddMainDocumentPart();
+                var mainPart = sourceDoc.AddMainDocumentPart();
                 mainPart.Document = new Document(new Body(new Paragraph(new Run(new Text("Source Body")))));
-                FooterPart footerPart = mainPart.AddNewPart<FooterPart>();
+                var footerPart = mainPart.AddNewPart<FooterPart>();
                 // Create a simple footer with text.
-                Footer footer = new Footer(new Paragraph(new Run(new Text("Footer Content"))));
+                var footer = new Footer(new Paragraph(new Run(new Text("Footer Content"))));
                 footerPart.Footer = footer;
                 footerPart.Footer.Save();
 
                 // Associate the footer with section properties.
-                SectionProperties sectPr = new SectionProperties();
-                FooterReference footerRef = new FooterReference() { Id = mainPart.GetIdOfPart(footerPart), Type = HeaderFooterValues.Default };
+                var sectPr = new SectionProperties();
+                var footerRef = new FooterReference() { Id = mainPart.GetIdOfPart(footerPart), Type = HeaderFooterValues.Default };
                 sectPr.Append(footerRef);
                 mainPart.Document.Body.Append(sectPr);
                 mainPart.Document.Save();
@@ -211,14 +213,14 @@ namespace DocxMergeService.Tests
             sourceStream.Position = 0;
 
             // Create target document without a footer.
-            using (WordprocessingDocument targetDoc = WordprocessingDocument.Create(targetStream, WordprocessingDocumentType.Document, true))
+            using (var targetDoc = WordprocessingDocument.Create(targetStream, WordprocessingDocumentType.Document, true))
             {
-                MainDocumentPart targetMainPart = targetDoc.AddMainDocumentPart();
+                var targetMainPart = targetDoc.AddMainDocumentPart();
                 targetMainPart.Document = new Document(new Body(new Paragraph(new Run(new Text("Target Body")))));
                 targetMainPart.Document.Save();
 
                 // Perform footer merge from source to target.
-                using (WordprocessingDocument sourceDoc = WordprocessingDocument.Open(sourceStream, false))
+                using (var sourceDoc = WordprocessingDocument.Open(sourceStream, false))
                 {
                     _docxService.MergeFooters(sourceDoc, targetDoc);
                 }
@@ -242,14 +244,14 @@ namespace DocxMergeService.Tests
             MemoryStream sourceStream = new MemoryStream();
 
             // Create target document with one style.
-            using (WordprocessingDocument targetDoc = WordprocessingDocument.Create(targetStream, WordprocessingDocumentType.Document, true))
+            using (var targetDoc = WordprocessingDocument.Create(targetStream, WordprocessingDocumentType.Document, true))
             {
-                MainDocumentPart targetMainPart = targetDoc.AddMainDocumentPart();
+                var targetMainPart = targetDoc.AddMainDocumentPart();
                 targetMainPart.Document = new Document(new Body(new Paragraph(new Run(new Text("Target Body")))));
                 // Add StyleDefinitionsPart with a style "TestStyle"
-                StyleDefinitionsPart targetStylesPart = targetMainPart.AddNewPart<StyleDefinitionsPart>();
-                Styles targetStyles = new Styles();
-                Style targetStyle = new Style() { Type = StyleValues.Paragraph, StyleId = "TestStyle" };
+                var targetStylesPart = targetMainPart.AddNewPart<StyleDefinitionsPart>();
+                var targetStyles = new Styles();
+                var targetStyle = new Style() { Type = StyleValues.Paragraph, StyleId = "TestStyle" };
                 targetStyle.Append(new Name() { Val = "Test Style" });
                 targetStyles.Append(targetStyle);
                 targetStylesPart.Styles = targetStyles;
@@ -259,14 +261,14 @@ namespace DocxMergeService.Tests
             targetStream.Position = 0;
 
             // Create source document with a style "TestStyle" but different definition.
-            using (WordprocessingDocument sourceDoc = WordprocessingDocument.Create(sourceStream, WordprocessingDocumentType.Document, true))
+            using (var sourceDoc = WordprocessingDocument.Create(sourceStream, WordprocessingDocumentType.Document, true))
             {
-                MainDocumentPart sourceMainPart = sourceDoc.AddMainDocumentPart();
+                var sourceMainPart = sourceDoc.AddMainDocumentPart();
                 sourceMainPart.Document = new Document(new Body(new Paragraph(new Run(new Text("Source Body")))));
                 // Add StyleDefinitionsPart with a conflicting style "TestStyle"
-                StyleDefinitionsPart sourceStylesPart = sourceMainPart.AddNewPart<StyleDefinitionsPart>();
-                Styles sourceStyles = new Styles();
-                Style sourceStyle = new Style() { Type = StyleValues.Paragraph, StyleId = "TestStyle" };
+                var sourceStylesPart = sourceMainPart.AddNewPart<StyleDefinitionsPart>();
+                var sourceStyles = new Styles();
+                var sourceStyle = new Style() { Type = StyleValues.Paragraph, StyleId = "TestStyle" };
                 sourceStyle.Append(new Name() { Val = "Conflicting Test Style" });
                 sourceStyles.Append(sourceStyle);
                 sourceStylesPart.Styles = sourceStyles;
@@ -276,16 +278,16 @@ namespace DocxMergeService.Tests
             sourceStream.Position = 0;
 
             // Open target document for merging styles.
-            using (WordprocessingDocument targetDoc = WordprocessingDocument.Open(targetStream, true))
+            using (var targetDoc = WordprocessingDocument.Open(targetStream, true))
             {
-                using (WordprocessingDocument sourceDoc = WordprocessingDocument.Open(sourceStream, false))
+                using (var sourceDoc = WordprocessingDocument.Open(sourceStream, false))
                 {
                     _docxService.MergeStyles(targetDoc, new System.Collections.Generic.List<WordprocessingDocument> { sourceDoc });
                 }
                 targetDoc.MainDocumentPart.Document.Save();
 
                 // Verify that the target styles part now contains two styles: the original and the renamed one.
-                StyleDefinitionsPart targetStylesPart = targetDoc.MainDocumentPart.StyleDefinitionsPart;
+                var targetStylesPart = targetDoc.MainDocumentPart.StyleDefinitionsPart;
                 var stylesList = targetStylesPart.Styles.Elements<Style>().ToList();
                 // Expecting both "TestStyle" and "TestStyle_merged"
                 Assert.Contains(stylesList, s => s.StyleId.Value == "TestStyle");
