@@ -2,12 +2,12 @@
  * @file docx_merge_service/Services/DocxService.cs
  * @description
  * This service class encapsulates operations on DOCX files using the Open XML SDK.
- * It provides methods to open a DOCX document from a stream, merge corrected text into the DOCX,
+ * It provides methods to load a DOCX document from a stream, merge corrected text into the DOCX,
  * extract various document parts (body, headers, footers, styles), merge headers and footers,
- * and now merge style definitions from multiple source documents into a target document.
+ * and merge style definitions from multiple source documents into a target document.
  *
  * Key features:
- * - OpenDocument(Stream stream): Opens a DOCX file in read/write mode.
+ * - LoadDocument(Stream stream): Loads a DOCX file in read/write mode.
  * - MergeDocument(MemoryStream originalStream, string correctedText): Merges corrected text into the DOCX.
  * - UpdateRunText(Run run, string newText): Updates the text of a Run element while preserving formatting.
  * - ExtractBody(WordprocessingDocument doc): Extracts the document body.
@@ -22,6 +22,7 @@
  * @dependencies
  * - DocumentFormat.OpenXml.Packaging: For opening and saving DOCX files.
  * - DocumentFormat.OpenXml.Wordprocessing: For accessing and manipulating document elements.
+ * - Microsoft.Extensions.Logging: For logging errors and informational messages.
  *
  * @notes
  * - The merging strategy for headers and footers is simple: if a header/footer exists in the source document,
@@ -38,22 +39,35 @@ using System.Collections.Generic;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Wordprocessing;
 using DocumentFormat.OpenXml;
+using Microsoft.Extensions.Logging;
 
 namespace DocxMergeService.Services
 {
     public class DocxService
     {
+        private readonly ILogger<DocxService> _logger;
+
         /// <summary>
-        /// Opens a DOCX document from the provided stream in read/write mode.
+        /// Constructs a new instance of DocxService with the specified logger.
+        /// </summary>
+        /// <param name="logger">The logger used for logging informational messages and errors.</param>
+        public DocxService(ILogger<DocxService> logger)
+        {
+            _logger = logger;
+        }
+
+        /// <summary>
+        /// Loads a DOCX document from the provided stream in read/write mode.
         /// </summary>
         /// <param name="stream">The stream containing the DOCX file.</param>
         /// <returns>A WordprocessingDocument instance.</returns>
         /// <exception cref="ArgumentNullException">Thrown if the stream is null.</exception>
-        public WordprocessingDocument OpenDocument(Stream stream)
+        public WordprocessingDocument LoadDocument(Stream stream)
         {
             if (stream == null)
                 throw new ArgumentNullException(nameof(stream), "Input stream cannot be null.");
 
+            _logger.LogInformation("Loading DOCX document from stream.");
             // Open the DOCX file in read/write mode.
             return WordprocessingDocument.Open(stream, true);
         }
@@ -71,84 +85,94 @@ namespace DocxMergeService.Services
         /// <exception cref="Exception">Throws an exception if the DOCX structure is invalid.</exception>
         public MemoryStream MergeDocument(MemoryStream originalStream, string correctedText)
         {
-            if (originalStream == null)
-                throw new ArgumentNullException(nameof(originalStream), "Original document stream cannot be null.");
-            if (correctedText == null)
-                throw new ArgumentNullException(nameof(correctedText), "Corrected text cannot be null.");
-
-            // Reset the stream position to ensure proper reading.
-            originalStream.Position = 0;
-            using (var wordDoc = OpenDocument(originalStream))
+            try
             {
-                // Retrieve the document body.
-                var body = wordDoc.MainDocumentPart?.Document?.Body;
-                if (body == null)
+                if (originalStream == null)
+                    throw new ArgumentNullException(nameof(originalStream), "Original document stream cannot be null.");
+                if (correctedText == null)
+                    throw new ArgumentNullException(nameof(correctedText), "Corrected text cannot be null.");
+
+                _logger.LogInformation("Starting DOCX merge process.");
+                // Reset the stream position to ensure proper reading.
+                originalStream.Position = 0;
+                using (var wordDoc = LoadDocument(originalStream))
                 {
-                    throw new Exception("Invalid DOCX structure: Missing document body.");
-                }
-
-                // Split the corrected text into paragraphs using newline delimiters.
-                var correctedParagraphs = correctedText.Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.None);
-                var originalParagraphs = body.Elements<Paragraph>().ToList();
-
-                // Determine the number of paragraphs to update (minimum of both counts).
-                int minCount = Math.Min(originalParagraphs.Count, correctedParagraphs.Length);
-
-                // Update existing paragraphs with corrected text.
-                for (int i = 0; i < minCount; i++)
-                {
-                    string newParaText = correctedParagraphs[i];
-
-                    // Get the current paragraph.
-                    var para = originalParagraphs[i];
-
-                    // Get all runs in the paragraph.
-                    var runs = para.Elements<Run>().ToList();
-
-                    if (runs.Any())
+                    // Retrieve the document body.
+                    var body = wordDoc.MainDocumentPart?.Document?.Body;
+                    if (body == null)
                     {
-                        // Update the first run's text with the new paragraph text.
-                        UpdateRunText(runs.First(), newParaText);
+                        throw new Exception("Invalid DOCX structure: Missing document body.");
+                    }
 
-                        // Remove any additional runs to prevent duplicate or conflicting formatting.
-                        foreach (var extraRun in runs.Skip(1).ToList())
+                    // Split the corrected text into paragraphs using newline delimiters.
+                    var correctedParagraphs = correctedText.Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.None);
+                    var originalParagraphs = body.Elements<Paragraph>().ToList();
+
+                    // Determine the number of paragraphs to update (minimum of both counts).
+                    int minCount = Math.Min(originalParagraphs.Count, correctedParagraphs.Length);
+
+                    // Update existing paragraphs with corrected text.
+                    for (int i = 0; i < minCount; i++)
+                    {
+                        string newParaText = correctedParagraphs[i];
+
+                        // Get the current paragraph.
+                        var para = originalParagraphs[i];
+
+                        // Get all runs in the paragraph.
+                        var runs = para.Elements<Run>().ToList();
+
+                        if (runs.Any())
                         {
-                            extraRun.Remove();
+                            // Update the first run's text with the new paragraph text.
+                            UpdateRunText(runs.First(), newParaText);
+
+                            // Remove any additional runs to prevent duplicate or conflicting formatting.
+                            foreach (var extraRun in runs.Skip(1).ToList())
+                            {
+                                extraRun.Remove();
+                            }
+                        }
+                        else
+                        {
+                            // If no run exists, create a new run with the corrected text.
+                            Run newRun = new Run(new Text(newParaText)
+                            {
+                                // Preserve spaces if needed.
+                                Space = new EnumValue<SpaceProcessingModeValues>(SpaceProcessingModeValues.Preserve)
+                            });
+                            para.Append(newRun);
                         }
                     }
-                    else
+
+                    // If the corrected text contains more paragraphs than the original,
+                    // append new paragraphs for the extra lines.
+                    for (int i = minCount; i < correctedParagraphs.Length; i++)
                     {
-                        // If no run exists, create a new run with the corrected text.
-                        Run newRun = new Run(new Text(newParaText)
-                        {
-                            // Preserve spaces if needed.
-                            Space = new EnumValue<SpaceProcessingModeValues>(SpaceProcessingModeValues.Preserve)
-                        });
-                        para.Append(newRun);
+                        Paragraph extraParagraph = new Paragraph(
+                            new Run(new Text(correctedParagraphs[i])
+                            {
+                                Space = new EnumValue<SpaceProcessingModeValues>(SpaceProcessingModeValues.Preserve)
+                            })
+                        );
+                        body.Append(extraParagraph);
                     }
+
+                    // Save the changes made to the document.
+                    wordDoc.MainDocumentPart.Document.Save();
+                    _logger.LogInformation("DOCX merge process completed successfully.");
                 }
 
-                // If the corrected text contains more paragraphs than the original,
-                // append new paragraphs for the extra lines.
-                for (int i = minCount; i < correctedParagraphs.Length; i++)
-                {
-                    Paragraph extraParagraph = new Paragraph(
-                        new Run(new Text(correctedParagraphs[i])
-                        {
-                            Space = new EnumValue<SpaceProcessingModeValues>(SpaceProcessingModeValues.Preserve)
-                        })
-                    );
-                    body.Append(extraParagraph);
-                }
-
-                // Save the changes made to the document.
-                wordDoc.MainDocumentPart.Document.Save();
+                // Create a new MemoryStream from the modified document.
+                MemoryStream mergedStream = new MemoryStream(originalStream.ToArray());
+                mergedStream.Position = 0;
+                return mergedStream;
             }
-
-            // Create a new MemoryStream from the modified document.
-            MemoryStream mergedStream = new MemoryStream(originalStream.ToArray());
-            mergedStream.Position = 0;
-            return mergedStream;
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred during DOCX merge process.");
+                throw;
+            }
         }
 
         /// <summary>
