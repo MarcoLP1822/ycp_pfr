@@ -3,11 +3,12 @@
  * @description
  * This file sets up the ASP.NET Core application.
  * In this update, I added the registration for DocxService in the DI container
- * so that it can be injected into controllers (e.g., MergeController).
+ * and configured the application to listen on the port specificato da Render tramite process.env.PORT.
  *
  * Key features:
  * - Registers controllers, Swagger, and DocxService.
  * - Configures middleware for HTTPS redirection and Swagger UI.
+ * - Configura il binding sulla porta fornita da Render.
  *
  * @dependencies
  * - Microsoft.AspNetCore.Builder: For building the app.
@@ -22,6 +23,11 @@ using Microsoft.OpenApi.Models;
 using DocxMergeService.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Imposta il binding sulla porta fornita da Render tramite la variabile d'ambiente PORT.
+// Render imposta automaticamente PORT, quindi usiamo quella; se non è definita, usiamo la porta 80 di default.
+var port = Environment.GetEnvironmentVariable("PORT") ?? "10000";
+builder.WebHost.UseUrls($"http://*:{port}");
 
 // Add services to the container.
 builder.Services.AddControllers();
