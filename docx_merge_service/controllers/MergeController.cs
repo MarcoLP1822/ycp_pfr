@@ -30,7 +30,7 @@ using DocxMergeService.Services;
 namespace DocxMergeService.Controllers
 {
     [ApiController]
-    [Route("[controller]")]
+    [Route("merge")]
     public class MergeController : ControllerBase
     {
         private readonly ILogger<MergeController> _logger;
@@ -49,7 +49,7 @@ namespace DocxMergeService.Controllers
         /// <param name="file">The DOCX file uploaded by the client.</param>
         /// <param name="correctedText">The corrected text to merge into the DOCX.</param>
         /// <returns>The merged DOCX file as a downloadable response.</returns>
-        [HttpPost("merge")]
+        [HttpPost]
         public async Task<IActionResult> Merge([FromForm] IFormFile file, [FromForm] string correctedText)
         {
             if (file == null || string.IsNullOrWhiteSpace(correctedText))
