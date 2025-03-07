@@ -236,7 +236,7 @@ const ProofreadingInterfacePage: React.FC = () => {
                 cursor: 'pointer',
               }}
             >
-              {editMode ? 'Save Changes' : 'Edit Corrected Text'}
+              {editMode ? 'Save Changes' : 'Modifica'}
             </Button>
             <Button
               onClick={handleProofread.bind(null, fileId as string)}
