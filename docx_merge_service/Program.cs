@@ -1,22 +1,20 @@
 /**
  * @file Program.cs
  * @description
- * This file sets up the ASP.NET Core application.
- * In this update, I added the registration for DocxService in the DI container
- * and configured the application to listen on the port specificato da Render tramite process.env.PORT.
- *
- * Key features:
- * - Registers controllers, Swagger, and DocxService.
- * - Configures middleware for HTTPS redirection and Swagger UI.
- * - Configura il binding sulla porta fornita da Render.
+ * Questo file configura l'applicazione ASP.NET Core.
+ * In questo aggiornamento:
+ * - Viene registrato il servizio DocxService per l'iniezione delle dipendenze.
+ * - Viene configurato il binding sulla porta specificata dalla variabile d'ambiente PORT (utilizzata da Render).
+ * - Vengono aggiunti i controller e Swagger per la documentazione.
  *
  * @dependencies
- * - Microsoft.AspNetCore.Builder: For building the app.
- * - Microsoft.Extensions.DependencyInjection: For dependency injection.
- * - DocxMergeService.Services.DocxService: Registered for use in controllers.
+ * - Microsoft.AspNetCore.Builder
+ * - Microsoft.Extensions.DependencyInjection
+ * - Microsoft.OpenApi.Models
+ * - DocxMergeService.Services.DocxService
  *
  * @notes
- * - Ensure that any new services are also added to the DI container here.
+ * - Assicurati che il controller che gestisce l'endpoint merge sia configurato correttamente (ad esempio, con [Route("merge")]).
  */
 
 using Microsoft.OpenApi.Models;
@@ -24,14 +22,13 @@ using DocxMergeService.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Imposta il binding sulla porta fornita da Render tramite la variabile d'ambiente PORT.
-// Render imposta automaticamente PORT, quindi usiamo quella; se non è definita, usiamo la porta 80 di default.
-var port = Environment.GetEnvironmentVariable("PORT") ?? "10000";
+// Imposta il binding sulla porta fornita da Render (se presente) o usa la porta 80 di default.
+var port = Environment.GetEnvironmentVariable("PORT") ?? "80";
 builder.WebHost.UseUrls($"http://*:{port}");
 
-// Add services to the container.
+// Registra i servizi nel container DI.
 builder.Services.AddControllers();
-builder.Services.AddScoped<DocxService>(); // Register DocxService for DI
+builder.Services.AddScoped<DocxService>(); // Registrazione di DocxService per l'iniezione nelle classi (ad es. MergeController)
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -40,7 +37,7 @@ builder.Services.AddSwaggerGen(c =>
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// Configurazione della pipeline HTTP.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -53,4 +50,5 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseAuthorization();
 app.MapControllers();
+
 app.Run();
