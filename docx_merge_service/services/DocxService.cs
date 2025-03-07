@@ -1,38 +1,19 @@
 /**
- * @file docx_merge_service/Services/DocxService.cs
+ * @file DocxService.cs
  * @description
- * This service class encapsulates operations on DOCX files using the Open XML SDK.
- * It provides methods to load a DOCX document from a stream, merge corrected text into the DOCX,
- * extract various document parts (body, headers, footers, styles), merge headers and footers,
- * and merge style definitions from multiple source documents into a target document.
+ * Questo servizio gestisce le operazioni sui file DOCX utilizzando l’Open XML SDK.
+ * In questa versione aggiornata, il metodo di “flattening” dei run è stato modificato per
+ * raggruppare i run contigui con le stesse proprietà, in modo da preservare la formattazione durante
+ * l’applicazione delle modifiche tramite diff a livello di testo.
  *
- * Key features:
- * - LoadDocument(Stream stream): Loads a DOCX file in read/write mode.
- * - MergeDocument(MemoryStream originalStream, string correctedText): Merges corrected text into the DOCX.
- *   Instead of simply replacing text, it uses a character-level diff to wrap inserted text in a revision element
- *   (representing an insertion: w:ins) and deleted text in a revision element (representing a deletion: w:del with a 
- *   w:delText child) so that Word's Track Changes functionality is enabled.
- * - ExtractBody(WordprocessingDocument doc): Extracts the document body.
- * - ExtractHeaders(WordprocessingDocument doc): Extracts header parts.
- * - ExtractFooters(WordprocessingDocument doc): Extracts footer parts.
- * - ExtractStyles(WordprocessingDocument doc): Extracts style definitions.
- * - MergeHeaders(WordprocessingDocument sourceDoc, WordprocessingDocument targetDoc): Merges header parts.
- * - MergeFooters(WordprocessingDocument sourceDoc, WordprocessingDocument targetDoc): Merges footer parts.
- * - MergeStyles(WordprocessingDocument targetDoc, List<WordprocessingDocument> sourceDocs): Merges style definitions
- *   from multiple source documents into the target document, renaming conflicting styles.
+ * Le principali modifiche sono:
+ * - Aggiunta del metodo FlattenParagraphGrouped che restituisce una lista di segmenti (stringa, RunProperties).
+ * - Aggiornamento del metodo BuildTrackChangesParagraph per usare i segmenti raggruppati e mappare correttamente
+ *   il diff sul testo originale.
  *
- * @dependencies
- * - DocumentFormat.OpenXml.Packaging: For opening and saving DOCX files.
- * - DocumentFormat.OpenXml.Wordprocessing: For accessing and manipulating document elements.
- * - Microsoft.Extensions.Logging: For logging errors and informational messages.
- * - DiffMatchPatch: For character-level diffing to determine track changes.
- *
- * @notes
- * - The merging strategy uses a diff on a flattened representation (character + formatting) of each paragraph.
- *   For each diff segment, text unchanged is output normally, inserted text is wrapped in a revision element,
- *   and deleted text is wrapped in a revision element containing a DeletedText element.
- * - Revision attributes (Author and Date) are set on these custom elements.
+ * Le altre funzionalità (merge di headers, footers e styles) rimangono invariate.
  */
+
 using System;
 using System.IO;
 using System.Linq;
@@ -49,21 +30,11 @@ namespace DocxMergeService.Services
     {
         private readonly ILogger<DocxService> _logger;
 
-        /// <summary>
-        /// Constructs a new instance of DocxService with the specified logger.
-        /// </summary>
-        /// <param name="logger">The logger used for logging informational messages and errors.</param>
         public DocxService(ILogger<DocxService> logger)
         {
             _logger = logger;
         }
 
-        /// <summary>
-        /// Loads a DOCX document from the provided stream in read/write mode.
-        /// </summary>
-        /// <param name="stream">The stream containing the DOCX file.</param>
-        /// <returns>A WordprocessingDocument instance.</returns>
-        /// <exception cref="ArgumentNullException">Thrown if the stream is null.</exception>
         public WordprocessingDocument LoadDocument(Stream stream)
         {
             if (stream == null)
@@ -72,15 +43,6 @@ namespace DocxMergeService.Services
             return WordprocessingDocument.Open(stream, true);
         }
 
-        /// <summary>
-        /// Merges the corrected text into the DOCX document by generating a new version that
-        /// uses Word's Track Changes functionality. It computes a character-level diff between the
-        /// original and corrected text for each paragraph, wrapping inserted text in a revision element
-        /// (w:ins) and deleted text in a revision element (w:del with a w:delText child).
-        /// </summary>
-        /// <param name="originalStream">The MemoryStream containing the original DOCX file.</param>
-        /// <param name="correctedText">The corrected text to merge into the document.</param>
-        /// <returns>A new MemoryStream containing the merged DOCX file with track changes.</returns>
         public MemoryStream MergeDocument(MemoryStream originalStream, string correctedText)
         {
             try
@@ -98,12 +60,12 @@ namespace DocxMergeService.Services
                     if (body == null)
                         throw new Exception("Invalid DOCX structure: Missing document body.");
 
-                    // Split corrected text into paragraphs.
+                    // Dividi il testo corretto in paragrafi.
                     var correctedParagraphs = correctedText.Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.None);
                     var originalParagraphs = body.Elements<Paragraph>().ToList();
                     int minCount = Math.Min(originalParagraphs.Count, correctedParagraphs.Length);
 
-                    // Process paragraphs in common using track changes.
+                    // Per ogni paragrafo in comune, applica il merge con track changes.
                     for (int i = 0; i < minCount; i++)
                     {
                         var origPara = originalParagraphs[i];
@@ -111,7 +73,7 @@ namespace DocxMergeService.Services
                         origPara.InsertAfterSelf(newPara);
                         origPara.Remove();
                     }
-                    // Append extra paragraphs from corrected text as full insertions.
+                    // Per i paragrafi extra nel testo corretto, li aggiunge come inserzioni complete.
                     for (int i = minCount; i < correctedParagraphs.Length; i++)
                     {
                         var insPara = new Paragraph();
@@ -135,49 +97,84 @@ namespace DocxMergeService.Services
         }
 
         /// <summary>
-        /// Builds a new Paragraph element by comparing the original paragraph and the corrected text.
-        /// Inserts revision elements for insertions and deletions based on a character-level diff.
+        /// Costruisce un nuovo paragrafo applicando le revisioni (insertions e deletions) mediante diff.
+        /// Utilizza una versione raggruppata dei run per preservare la formattazione.
         /// </summary>
-        /// <param name="originalParagraph">The original paragraph element.</param>
-        /// <param name="correctedParaText">The corrected text for this paragraph.</param>
-        /// <returns>A new Paragraph element with track changes markup.</returns>
         private Paragraph BuildTrackChangesParagraph(Paragraph originalParagraph, string correctedParaText)
         {
-            var flattened = FlattenParagraph(originalParagraph);
-            string originalText = new string(flattened.Select(x => x.c).ToArray());
+            // Raggruppa i run contigui in base alle proprietà.
+            var grouped = FlattenParagraphGrouped(originalParagraph);
+            var originalText = string.Join("", grouped.Select(g => g.Text));
 
             var dmp = new diff_match_patch();
             var diffs = dmp.diff_main(originalText, correctedParaText, false);
             dmp.diff_cleanupSemantic(diffs);
 
-            var newParagraph = new Paragraph();
-            int origIndex = 0;
+            var groupedDiffs = new List<(Operation op, string text, RunProperties? props)>();
+
+            int globalIndex = 0;
+            int groupIndex = 0;
+            int groupStart = 0;
+            RunProperties? currentProps = grouped.FirstOrDefault().Props;
 
             foreach (var diff in diffs)
             {
-                switch (diff.operation)
+                // Aggiorna l'indice globale e determina le proprietà correnti in base al gruppo.
+                while (groupIndex < grouped.Count && globalIndex >= groupStart + grouped[groupIndex].Text.Length)
+                {
+                    groupStart += grouped[groupIndex].Text.Length;
+                    groupIndex++;
+                    if (groupIndex < grouped.Count)
+                        currentProps = grouped[groupIndex].Props;
+                }
+
+                RunProperties? diffProps = null;
+                if (diff.operation == Operation.EQUAL || diff.operation == Operation.DELETE)
+                {
+                    diffProps = currentProps;
+                }
+                else if (diff.operation == Operation.INSERT)
+                {
+                    // Per le inserzioni, utilizza le proprietà del gruppo precedente se disponibili.
+                    diffProps = groupIndex > 0 ? grouped[groupIndex - 1].Props : null;
+                }
+
+                // Raggruppa diff consecutivi con lo stesso tipo e proprietà.
+                if (groupedDiffs.Count > 0 && groupedDiffs.Last().op == diff.operation &&
+                    AreRunPropertiesEqual(groupedDiffs.Last().props, diffProps))
+                {
+                    var last = groupedDiffs.Last();
+                    groupedDiffs[groupedDiffs.Count - 1] = (last.op, last.text + diff.text, last.props);
+                }
+                else
+                {
+                    groupedDiffs.Add((diff.operation, diff.text, diffProps));
+                }
+
+                if (diff.operation != Operation.INSERT)
+                    globalIndex += diff.text.Length;
+            }
+
+            // Costruisce il nuovo paragrafo applicando le revisioni.
+            var newParagraph = new Paragraph();
+            foreach (var group in groupedDiffs)
+            {
+                Run run;
+                switch (group.op)
                 {
                     case Operation.EQUAL:
-                        if (diff.text.Length > 0)
-                        {
-                            RunProperties? props = (origIndex < flattened.Count) ? flattened[origIndex].props : null;
-                            var run = BuildRun(diff.text, props);
-                            newParagraph.AppendChild(run);
-                        }
-                        origIndex += diff.text.Length;
+                        run = BuildRun(group.text, group.props);
+                        newParagraph.AppendChild(run);
                         break;
                     case Operation.INSERT:
-                        RunProperties? insProps = (origIndex > 0) ? flattened[origIndex - 1].props : null;
-                        var insRun = BuildRun(diff.text, insProps);
-                        var inserted = CreateRevisionElement("ins", insRun, "GPT-4 Correction");
-                        newParagraph.AppendChild(inserted);
+                        run = BuildRun(group.text, group.props);
+                        var insElement = CreateRevisionElement("ins", run, "GPT-4 Correction");
+                        newParagraph.AppendChild(insElement);
                         break;
                     case Operation.DELETE:
-                        RunProperties? delProps = (origIndex < flattened.Count && diff.text.Length > 0) ? flattened[origIndex].props : null;
-                        var delRun = BuildDeletedRun(diff.text, delProps);
-                        var deleted = CreateRevisionElement("del", delRun, "GPT-4 Correction");
-                        newParagraph.AppendChild(deleted);
-                        origIndex += diff.text.Length;
+                        run = BuildDeletedRun(group.text, group.props);
+                        var delElement = CreateRevisionElement("del", run, "GPT-4 Correction");
+                        newParagraph.AppendChild(delElement);
                         break;
                 }
             }
@@ -185,17 +182,51 @@ namespace DocxMergeService.Services
         }
 
         /// <summary>
-        /// Creates a revision element as a composite element using OpenXmlUnknownElement.
-        /// tagName should be "ins" for insertions or "del" for deletions.
+        /// Raggruppa i run contigui di un paragrafo in segmenti (stringa, RunProperties).
         /// </summary>
-        /// <param name="tagName">The revision tag ("ins" or "del").</param>
-        /// <param name="childRun">The Run element to include as content.</param>
-        /// <param name="author">The revision author.</param>
-        /// <returns>An OpenXmlElement representing the revision.</returns>
+        private List<(string Text, RunProperties? Props)> FlattenParagraphGrouped(Paragraph paragraph)
+        {
+            var result = new List<(string Text, RunProperties? Props)>();
+
+            foreach (var run in paragraph.Elements<Run>())
+            {
+                var runProps = run.RunProperties?.CloneNode(true) as RunProperties;
+                string runText = string.Concat(run.Elements<Text>().Select(t => t.Text));
+                if (!string.IsNullOrEmpty(runText))
+                {
+                    if (result.Count > 0 && AreRunPropertiesEqual(result.Last().Props, runProps))
+                    {
+                        var last = result.Last();
+                        result[result.Count - 1] = (last.Text + runText, last.Props);
+                    }
+                    else
+                    {
+                        result.Add((runText, runProps));
+                    }
+                }
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// Confronta due istanze di RunProperties in base all'OuterXml.
+        /// </summary>
+        private bool AreRunPropertiesEqual(RunProperties? props1, RunProperties? props2)
+        {
+            if (props1 == null && props2 == null)
+                return true;
+            if (props1 == null || props2 == null)
+                return false;
+            return props1.OuterXml == props2.OuterXml;
+        }
+
+        /// <summary>
+        /// Crea un elemento di revisione (inserimento o cancellazione) contenente il run fornito.
+        /// </summary>
         private OpenXmlElement CreateRevisionElement(string tagName, Run childRun, string author)
         {
             string wordprocessingNamespace = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
-            
+
             OpenXmlElement revision;
             if (tagName == "ins")
             {
@@ -205,45 +236,21 @@ namespace DocxMergeService.Services
             {
                 revision = new DeletedRun();
             }
-            
+
             revision.SetAttribute(new OpenXmlAttribute("w", "author", wordprocessingNamespace, author));
             revision.SetAttribute(new OpenXmlAttribute("w", "date", wordprocessingNamespace, DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ")));
-            
+
             if (childRun != null)
             {
                 revision.AppendChild(childRun.CloneNode(true));
             }
-            
+
             return revision;
         }
 
         /// <summary>
-        /// Flattens a paragraph into a list of (char, RunProperties?) pairs,
-        /// representing each character and its associated formatting.
+        /// Crea un Run con il testo specificato e le proprietà fornite.
         /// </summary>
-        /// <param name="paragraph">The Paragraph to flatten.</param>
-        /// <returns>A list of (char, RunProperties?) pairs.</returns>
-        private List<(char c, RunProperties? props)> FlattenParagraph(Paragraph paragraph)
-        {
-            var result = new List<(char c, RunProperties? props)>();
-            foreach (var run in paragraph.Elements<Run>())
-            {
-                var runProps = run.RunProperties?.CloneNode(true) as RunProperties;
-                string runText = string.Concat(run.Elements<Text>().Select(t => t.Text));
-                foreach (char ch in runText)
-                {
-                    result.Add((ch, runProps));
-                }
-            }
-            return result;
-        }
-
-        /// <summary>
-        /// Creates a Run element with the given text and optional RunProperties.
-        /// </summary>
-        /// <param name="text">The text content.</param>
-        /// <param name="props">The RunProperties to apply (can be null).</param>
-        /// <returns>A new Run element.</returns>
         private Run BuildRun(string text, RunProperties? props)
         {
             var run = new Run();
@@ -256,11 +263,8 @@ namespace DocxMergeService.Services
         }
 
         /// <summary>
-        /// Creates a Run element for a deletion using a DeletedText element.
+        /// Crea un Run per il testo da cancellare, utilizzando l'elemento DeletedText.
         /// </summary>
-        /// <param name="text">The text content to mark as deleted.</param>
-        /// <param name="props">The RunProperties to apply (can be null).</param>
-        /// <returns>A new Run element containing a DeletedText child.</returns>
         private Run BuildDeletedRun(string text, RunProperties? props)
         {
             var run = new Run();
@@ -272,11 +276,8 @@ namespace DocxMergeService.Services
             return run;
         }
 
-        /// <summary>
-        /// Merges the header parts from the source document into the target document.
-        /// This method copies the first header from the source document, creates a new header part in the target,
-        /// and updates the target document's section properties to reference the new header.
-        /// </summary>
+        // I metodi per il merge di headers, footers e styles rimangono invariati.
+
         public void MergeHeaders(WordprocessingDocument sourceDoc, WordprocessingDocument targetDoc)
         {
             var sourceHeaders = ExtractHeaders(sourceDoc);
@@ -307,11 +308,6 @@ namespace DocxMergeService.Services
             mainPart.Document.Save();
         }
 
-        /// <summary>
-        /// Merges the footer parts from the source document into the target document.
-        /// This method copies the first footer from the source document, creates a new footer part in the target,
-        /// and updates the target document's section properties to reference the new footer.
-        /// </summary>
         public void MergeFooters(WordprocessingDocument sourceDoc, WordprocessingDocument targetDoc)
         {
             var sourceFooters = ExtractFooters(sourceDoc);
@@ -342,9 +338,6 @@ namespace DocxMergeService.Services
             mainPart.Document.Save();
         }
 
-        /// <summary>
-        /// Extracts the main document body from the given WordprocessingDocument.
-        /// </summary>
         public Body ExtractBody(WordprocessingDocument doc)
         {
             var body = doc.MainDocumentPart?.Document?.Body;
@@ -353,27 +346,18 @@ namespace DocxMergeService.Services
             return body;
         }
 
-        /// <summary>
-        /// Extracts all header parts from the given WordprocessingDocument.
-        /// </summary>
         public List<HeaderPart> ExtractHeaders(WordprocessingDocument doc)
         {
             var headers = doc.MainDocumentPart?.HeaderParts;
             return headers != null ? headers.ToList() : new List<HeaderPart>();
         }
 
-        /// <summary>
-        /// Extracts all footer parts from the given WordprocessingDocument.
-        /// </summary>
         public List<FooterPart> ExtractFooters(WordprocessingDocument doc)
         {
             var footers = doc.MainDocumentPart?.FooterParts;
             return footers != null ? footers.ToList() : new List<FooterPart>();
         }
 
-        /// <summary>
-        /// Extracts the styles from the given WordprocessingDocument.
-        /// </summary>
         public Styles ExtractStyles(WordprocessingDocument doc)
         {
             var stylesPart = doc.MainDocumentPart?.StyleDefinitionsPart;
@@ -382,10 +366,6 @@ namespace DocxMergeService.Services
             return stylesPart.Styles;
         }
 
-        /// <summary>
-        /// Merges the style definitions from multiple source documents into the target document.
-        /// If a style conflict is detected, the source style is renamed with "_merged".
-        /// </summary>
         public void MergeStyles(WordprocessingDocument targetDoc, List<WordprocessingDocument> sourceDocs)
         {
             if (targetDoc == null)
