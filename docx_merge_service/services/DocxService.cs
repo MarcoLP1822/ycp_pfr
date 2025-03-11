@@ -5,7 +5,7 @@ using System.Linq;
 using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Wordprocessing;
-using DiffMatchPatch; // From the "DiffMatchPatch" NuGet package
+using DiffMatchPatch; // From NuGet package "DiffMatchPatch"
 using Microsoft.Extensions.Logging;
 
 namespace DocxMergeService.Services
@@ -20,7 +20,7 @@ namespace DocxMergeService.Services
         }
 
         /// <summary>
-        /// Loads a WordprocessingDocument from a Stream (in read/write mode).
+        /// Loads a WordprocessingDocument from a Stream (read/write).
         /// </summary>
         public WordprocessingDocument LoadDocument(Stream stream)
         {
@@ -31,20 +31,15 @@ namespace DocxMergeService.Services
         }
 
         /// <summary>
-        /// Merges the corrected text into the original DOCX, preserving formatting
-        /// and creating real track changes (insertions/deletions).
+        /// Merges the corrected text into the original DOCX while preserving run-level formatting.
         /// 
-        /// Steps:
-        /// 1) Enable track revisions in document settings.
-        /// 2) For each paragraph in the document, do a diff with the corresponding corrected paragraph text.
-        /// 3) Edit runs in place: 
-        ///    - Mark new text as <w:ins>.
-        ///    - Mark removed text as <w:del>.
-        ///    - Keep unchanged text as normal runs with original RunProperties.
-        /// 4) If corrected text has more paragraphs than the original, append them as inserted paragraphs.
-        ///    If original has more than corrected, mark them as deleted paragraphs.
+        /// 1) Enables track revisions.
+        /// 2) For each original paragraph, we do a "run-by-run" approach:
+        ///    - If # of paragraphs match, we only modify text in place.
+        ///    - If corrected text has extra paragraphs, we insert them as new.
+        ///    - If original has extra paragraphs, we mark them as deleted.
         /// 
-        /// Returns a MemoryStream of the final merged docx with track changes.
+        /// Returns a MemoryStream with the final .docx containing real track changes.
         /// </summary>
         public MemoryStream MergeDocument(MemoryStream originalStream, string correctedText)
         {
@@ -55,35 +50,32 @@ namespace DocxMergeService.Services
                 if (correctedText == null)
                     throw new ArgumentNullException(nameof(correctedText), "Corrected text cannot be null.");
 
-                _logger.LogInformation("Starting DOCX merge process with track changes (in-place).");
+                _logger.LogInformation("Starting DOCX merge with run-by-run track changes.");
                 originalStream.Position = 0;
 
                 using (var wordDoc = LoadDocument(originalStream))
                 {
-                    // 1) Enable track revisions at the document level
                     EnableTrackRevisions(wordDoc);
 
                     var body = wordDoc.MainDocumentPart?.Document?.Body;
                     if (body == null)
                         throw new Exception("Invalid DOCX structure: Missing document body.");
 
-                    // Split corrected text into paragraphs by newline
-                    var correctedParagraphs = correctedText.Split(
-                        new[] { "\r\n", "\n" }, StringSplitOptions.None
-                    );
+                    // Split corrected text into paragraphs
+                    var correctedParagraphs = correctedText.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
                     var originalParagraphs = body.Elements<Paragraph>().ToList();
 
                     int commonCount = Math.Min(originalParagraphs.Count, correctedParagraphs.Length);
 
-                    // 2) For each paragraph in the overlapping range, update in place
+                    // Update each paragraph in place (run by run)
                     for (int i = 0; i < commonCount; i++)
                     {
                         var origPara = originalParagraphs[i];
                         var correctedParaText = correctedParagraphs[i];
-                        UpdateParagraphWithTrackChanges(origPara, correctedParaText);
+                        UpdateParagraphRunByRun(origPara, correctedParaText);
                     }
 
-                    // 3) If corrected has more paragraphs, insert them as new paragraphs
+                    // If corrected has more paragraphs, insert them as new
                     for (int i = commonCount; i < correctedParagraphs.Length; i++)
                     {
                         var newPara = new Paragraph();
@@ -91,7 +83,7 @@ namespace DocxMergeService.Services
                         body.AppendChild(newPara);
                     }
 
-                    // 4) If original has more paragraphs, mark them as deleted
+                    // If original has more paragraphs, mark them as deleted
                     for (int i = commonCount; i < originalParagraphs.Count; i++)
                     {
                         MarkParagraphAsDeleted(originalParagraphs[i]);
@@ -100,22 +92,21 @@ namespace DocxMergeService.Services
                     wordDoc.MainDocumentPart.Document.Save();
                 }
 
-                // Return final doc as MemoryStream
-                MemoryStream mergedStream = new MemoryStream(originalStream.ToArray());
+                var mergedStream = new MemoryStream(originalStream.ToArray());
                 mergedStream.Position = 0;
 
-                _logger.LogInformation("DOCX merge with track changes completed successfully.");
+                _logger.LogInformation("DOCX merge with run-by-run track changes completed successfully.");
                 return mergedStream;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error occurred during DOCX merge with track changes.");
+                _logger.LogError(ex, "Error during run-by-run DOCX merge.");
                 throw;
             }
         }
 
         /// <summary>
-        /// Enables Word's track revisions so that <w:ins> and <w:del> show up as tracked changes.
+        /// Enables Word's "track revisions" so that <w:ins> and <w:del> appear as real track changes.
         /// </summary>
         private void EnableTrackRevisions(WordprocessingDocument doc)
         {
@@ -128,73 +119,119 @@ namespace DocxMergeService.Services
             if (settingsPart.Settings == null)
                 settingsPart.Settings = new Settings();
 
-            // <w:trackRevisions w:val="true" />
+            // <w:trackRevisions w:val="true"/>
             var trackRevisions = new TrackRevisions { Val = OnOffValue.FromBoolean(true) };
             settingsPart.Settings.AppendChild(trackRevisions);
             settingsPart.Settings.Save();
         }
 
         /// <summary>
-        /// Updates a single paragraph in place using track changes:
-        /// - Uses diff-match-patch to compare original paragraph text vs. corrected text.
-        /// - Replaces the paragraph's runs with new runs that preserve formatting but mark inserted/deleted text.
+        /// Edits a single paragraph in place, run by run.
+        /// 
+        /// For each run:
+        ///  1) Compare original run text to the portion of corrected text that remains.
+        ///  2) Use diff-match-patch to see how that run changed.
+        ///  3) Build <w:ins> or <w:del> only for changed segments; keep the rest as is.
+        /// 
+        /// After we finish each run, we advance the corrected-text index by however many "equal" or "insert" chars we used.
+        /// If corrected text is shorter, leftover run text is marked as <w:del>.
+        /// If corrected text is longer, leftover text at the end is <w:ins>.
         /// </summary>
-        private void UpdateParagraphWithTrackChanges(Paragraph paragraph, string correctedParaText)
+        private void UpdateParagraphRunByRun(Paragraph paragraph, string correctedParaText)
         {
-            // 1) Flatten original runs => single string
-            var runList = paragraph.Elements<Run>().ToList();
-            string originalText = string.Concat(runList.Select(r => string.Concat(r.Elements<Text>().Select(t => t.Text))));
+            // Gather all runs in the paragraph
+            var originalRuns = paragraph.Elements<Run>().ToList();
 
-            // 2) Diff with corrected text
-            var dmp = new diff_match_patch();
-            var diffs = dmp.diff_main(originalText, correctedParaText, false);
-            // Optional: dmp.diff_cleanupSemantic(diffs);
+            // We'll create a new list of child elements that represent the updated content
+            var newChildren = new List<OpenXmlElement>();
 
-            // 3) Flatten the original runs into (text, runProps) for more granular sub-run manipulation
-            var flattenedRuns = FlattenRuns(runList);
+            // We'll keep a "cursor" into the correctedParaText
+            int correctedIndex = 0;
+            int correctedLength = correctedParaText.Length;
 
-            // We'll build a brand new set of child elements for the paragraph
-            List<OpenXmlElement> newChildren = new List<OpenXmlElement>();
-
-            int runIndex = 0;
-            int runLocalPos = 0;
-
-            // 4) Walk through each diff chunk
-            foreach (var diff in diffs)
+            // For each original run, see how it changed
+            foreach (var run in originalRuns)
             {
-                var op = diff.operation;
-                var chunkText = diff.text;
+                string runText = string.Concat(run.Elements<Text>().Select(t => t.Text));
+                var runProps = run.RunProperties?.CloneNode(true) as RunProperties;
 
-                if (op == Operation.EQUAL)
+                // If there's no text in the run, skip it
+                if (string.IsNullOrEmpty(runText))
                 {
-                    // No change => normal runs with original formatting
-                    newChildren.AddRange(
-                        RebuildRuns(flattenedRuns, chunkText, isDeleted: false, isInserted: false,
-                                    ref runIndex, ref runLocalPos)
-                    );
+                    // Just re-append it if there's no actual text
+                    newChildren.Add(run.CloneNode(true));
+                    continue;
                 }
-                else if (op == Operation.DELETE)
+
+                // We'll diff this run's text vs. the "remaining" corrected text
+                // The "remaining" corrected text is correctedParaText.Substring(correctedIndex)
+                // But we don't know how far to go. We'll just diff the entire remainder.
+                var dmp = new diff_match_patch();
+                string correctedRemainder = correctedParaText.Substring(correctedIndex);
+                var diffs = dmp.diff_main(runText, correctedRemainder, false);
+                // Optional cleanup
+                // dmp.diff_cleanupSemantic(diffs);
+
+                // We'll parse the diffs to build new runs
+                int localCorrectedUsed = 0; // how many characters from correctedRemainder we used
+
+                foreach (var diff in diffs)
                 {
-                    // Mark as deleted
-                    newChildren.AddRange(
-                        RebuildRuns(flattenedRuns, chunkText, isDeleted: true, isInserted: false,
-                                    ref runIndex, ref runLocalPos)
-                    );
+                    var op = diff.operation;
+                    var text = diff.text;
+
+                    if (op == Operation.EQUAL)
+                    {
+                        // This text is unchanged => same run properties, no <w:ins>/<w:del>
+                        var runElement = new Run();
+                        if (runProps != null)
+                            runElement.RunProperties = (RunProperties)runProps.CloneNode(true);
+
+                        runElement.AppendChild(new Text(text) { Space = SpaceProcessingModeValues.Preserve });
+                        newChildren.Add(runElement);
+
+                        // We consumed "text.Length" from the corrected side
+                        localCorrectedUsed += text.Length;
+                    }
+                    else if (op == Operation.DELETE)
+                    {
+                        // This text was removed => <w:del>
+                        var delRun = BuildDeletedRun(text, runProps);
+                        newChildren.Add(delRun);
+                        // No consumption from corrected text (since it's a removal)
+                    }
+                    else if (op == Operation.INSERT)
+                    {
+                        // This text was inserted => <w:ins>
+                        var insRun = BuildInsertedRun(text, runProps);
+                        newChildren.Add(insRun);
+
+                        // We consumed "text.Length" from the corrected side
+                        localCorrectedUsed += text.Length;
+                    }
                 }
-                else if (op == Operation.INSERT)
-                {
-                    // Inserted text => new runs
-                    newChildren.AddRange(
-                        BuildInsertedRuns(chunkText)
-                    );
-                }
+
+                // After finishing diffs for this run, move correctedIndex forward
+                correctedIndex += localCorrectedUsed;
+                if (correctedIndex > correctedLength)
+                    correctedIndex = correctedLength;
             }
 
-            // 5) Clear out the old runs and replace with newChildren
+            // If there's leftover corrected text that wasn't matched to any original run => <w:ins>
+            if (correctedIndex < correctedLength)
+            {
+                string leftover = correctedParaText.Substring(correctedIndex);
+                var insRun = BuildInsertedRun(leftover, null);
+                newChildren.Add(insRun);
+                correctedIndex = correctedLength;
+            }
+
+            // Now remove the old runs from the paragraph, replace with newChildren
             paragraph.RemoveAllChildren<Run>();
-            paragraph.RemoveAllChildren<BookmarkStart>(); // (optional) remove old bookmarks if needed
-            paragraph.RemoveAllChildren<BookmarkEnd>();   // (optional)
-            // Then re-append
+            // (Optionally remove old Bookmarks if you want)
+            paragraph.RemoveAllChildren<BookmarkStart>();
+            paragraph.RemoveAllChildren<BookmarkEnd>();
+
             foreach (var child in newChildren)
             {
                 paragraph.AppendChild(child);
@@ -202,135 +239,37 @@ namespace DocxMergeService.Services
         }
 
         /// <summary>
-        /// Converts a list of runs into a list of (text, runProperties).
-        /// This is used to match portions of text with their original formatting.
+        /// Creates a run that is marked as deleted text (<w:del> with <w:delText>).
+        /// Preserves the original run properties if provided.
         /// </summary>
-        private List<(string text, RunProperties? props)> FlattenRuns(List<Run> runs)
+        private OpenXmlElement BuildDeletedRun(string text, RunProperties runProps)
         {
-            var result = new List<(string text, RunProperties? props)>();
-            foreach (var run in runs)
+            var runElement = new Run();
+            if (runProps != null)
+                runElement.RunProperties = (RunProperties)runProps.CloneNode(true);
+
+            runElement.AppendChild(new DeletedText(text) { Space = SpaceProcessingModeValues.Preserve });
+
+            var delRun = new DeletedRun
             {
-                var runProps = run.RunProperties?.CloneNode(true) as RunProperties;
-                string runText = string.Concat(run.Elements<Text>().Select(t => t.Text));
-                if (!string.IsNullOrEmpty(runText))
-                {
-                    result.Add((runText, runProps));
-                }
-            }
-            return result;
+                Author = "GPT-4 Correction",
+                Date = DateTime.UtcNow
+            };
+            delRun.Append(runElement);
+            return delRun;
         }
 
         /// <summary>
-        /// Rebuilds runs (normal or deleted) from the portion of text that matches
-        /// the flattened original runs' formatting. 
-        /// 
-        /// - If isDeleted=true, wraps them in <w:del> with DeletedText.
-        /// - If isInserted=true, we skip here and handle in a separate method (BuildInsertedRuns).
+        /// Creates a run that is marked as inserted text (<w:ins> with normal <w:t>).
+        /// Preserves the original run properties if you wish (or pass null for no props).
         /// </summary>
-        private List<OpenXmlElement> RebuildRuns(
-            List<(string text, RunProperties? props)> flattenedRuns,
-            string chunkText,
-            bool isDeleted,
-            bool isInserted, // not used here, but left for clarity
-            ref int runIndex,
-            ref int runLocalPos)
+        private OpenXmlElement BuildInsertedRun(string text, RunProperties runProps)
         {
-            var output = new List<OpenXmlElement>();
-            int needed = chunkText.Length;
-            int consumed = 0;
+            var runElement = new Run();
+            if (runProps != null)
+                runElement.RunProperties = (RunProperties)runProps.CloneNode(true);
 
-            while (needed > 0 && runIndex < flattenedRuns.Count)
-            {
-                var (origText, origProps) = flattenedRuns[runIndex];
-                int remainingInRun = origText.Length - runLocalPos;
-                if (remainingInRun <= 0)
-                {
-                    runIndex++;
-                    runLocalPos = 0;
-                    continue;
-                }
-
-                int takeLen = Math.Min(remainingInRun, needed);
-                string subText = origText.Substring(runLocalPos, takeLen);
-
-                // Build the run with subText
-                var runElement = new Run();
-                if (origProps != null)
-                {
-                    runElement.RunProperties = (RunProperties)origProps.CloneNode(true);
-                }
-
-                if (isDeleted)
-                {
-                    // For deleted text, use <w:delText> inside <w:del>
-                    var delText = new DeletedText(subText) { Space = SpaceProcessingModeValues.Preserve };
-                    runElement.Append(delText);
-
-                    // Wrap in <w:del> to represent a revision
-                    var delRun = new DeletedRun
-                    {
-                        Author = "GPT-4 Correction",
-                        Date = DateTime.UtcNow
-                    };
-                    delRun.Append(runElement);
-                    output.Add(delRun);
-                }
-                else
-                {
-                    // Normal text
-                    runElement.Append(new Text(subText) { Space = SpaceProcessingModeValues.Preserve });
-                    output.Add(runElement);
-                }
-
-                consumed += takeLen;
-                needed -= takeLen;
-                runLocalPos += takeLen;
-
-                // If we've consumed the entire run text, move to the next
-                if (runLocalPos >= origText.Length)
-                {
-                    runIndex++;
-                    runLocalPos = 0;
-                }
-            }
-
-            // If there's leftover text but no more runs, we can create runs with no props or ignore
-            if (needed > 0 && runIndex >= flattenedRuns.Count)
-            {
-                // We'll just create a new run with default properties
-                string leftover = chunkText.Substring(consumed, needed);
-                if (isDeleted)
-                {
-                    var runElement = new Run(new DeletedText(leftover) { Space = SpaceProcessingModeValues.Preserve });
-                    var delRun = new DeletedRun
-                    {
-                        Author = "GPT-4 Correction",
-                        Date = DateTime.UtcNow
-                    };
-                    delRun.Append(runElement);
-                    output.Add(delRun);
-                }
-                else
-                {
-                    var runElement = new Run(new Text(leftover) { Space = SpaceProcessingModeValues.Preserve });
-                    output.Add(runElement);
-                }
-            }
-
-            return output;
-        }
-
-        /// <summary>
-        /// Builds runs for inserted text. 
-        /// Wraps them in <w:ins> elements to mark as an insertion.
-        /// By default, uses no run properties or you can define a default set.
-        /// </summary>
-        private List<OpenXmlElement> BuildInsertedRuns(string insertedText)
-        {
-            var result = new List<OpenXmlElement>();
-
-            // You could split insertedText into lines or keep it as is
-            var runElement = new Run(new Text(insertedText) { Space = SpaceProcessingModeValues.Preserve });
+            runElement.AppendChild(new Text(text) { Space = SpaceProcessingModeValues.Preserve });
 
             var insRun = new InsertedRun
             {
@@ -338,18 +277,14 @@ namespace DocxMergeService.Services
                 Date = DateTime.UtcNow
             };
             insRun.Append(runElement);
-
-            result.Add(insRun);
-            return result;
+            return insRun;
         }
 
         /// <summary>
         /// Inserts a brand-new paragraph as a full insertion.
-        /// This is used when the corrected text has more paragraphs than the original.
         /// </summary>
         private void InsertFullParagraphAsIns(Paragraph para, string paragraphText)
         {
-            // Create a single inserted run for the entire paragraph
             var run = new Run(new Text(paragraphText) { Space = SpaceProcessingModeValues.Preserve });
             var ins = new InsertedRun
             {
@@ -361,26 +296,20 @@ namespace DocxMergeService.Services
         }
 
         /// <summary>
-        /// Marks an entire paragraph as deleted. This is used when the original doc has more paragraphs
-        /// than the corrected text, so we treat them as removed.
+        /// Marks an entire paragraph as deleted, used when the original doc has
+        /// more paragraphs than the corrected text.
         /// </summary>
         private void MarkParagraphAsDeleted(Paragraph paragraph)
         {
-            // Option A: wrap all runs in <w:del>
-            // Option B: Replace the entire paragraph with a single run that says "[Paragraph deleted]"
-            // For demonstration, we wrap each run in <w:del>.
-
+            // Wrap each run in <w:del>
             var runs = paragraph.Elements<Run>().ToList();
             foreach (var run in runs)
             {
-                // Move run's text to <w:delText>
-                var originalText = string.Concat(run.Elements<Text>().Select(t => t.Text));
-
+                string originalText = string.Concat(run.Elements<Text>().Select(t => t.Text));
                 run.RemoveAllChildren<Text>();
                 var delText = new DeletedText(originalText) { Space = SpaceProcessingModeValues.Preserve };
                 run.AppendChild(delText);
 
-                // Wrap the run in <w:del>
                 var delRun = new DeletedRun
                 {
                     Author = "GPT-4 Correction",
@@ -392,10 +321,10 @@ namespace DocxMergeService.Services
             }
         }
 
-        // --------------------------------------------------------------------
-        // The following methods are the same from your original code
-        // for merging headers, footers, styles, etc.
-        // --------------------------------------------------------------------
+        // ----------------------------------------------------------------
+        // Additional methods for merging headers, footers, styles, etc.
+        // (Same as in your previous code; included here for completeness.)
+        // ----------------------------------------------------------------
 
         public void MergeHeaders(WordprocessingDocument sourceDoc, WordprocessingDocument targetDoc)
         {
