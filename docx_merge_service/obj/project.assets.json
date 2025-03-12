@@ -67,6 +67,19 @@
           }
         }
       },
+      "OpenXmlPowerTools/4.5.3.2": {
+        "type": "package",
+        "dependencies": {
+          "DocumentFormat.OpenXml": "2.7.2",
+          "System.Management.Automation.dll": "10.0.10586"
+        },
+        "compile": {
+          "lib/net45/OpenXmlPowerTools.dll": {}
+        },
+        "runtime": {
+          "lib/net45/OpenXmlPowerTools.dll": {}
+        }
+      },
       "Swashbuckle.AspNetCore/7.3.1": {
         "type": "package",
         "dependencies": {
@@ -147,6 +160,15 @@
         },
         "build": {
           "buildTransitive/net6.0/_._": {}
+        }
+      },
+      "System.Management.Automation.dll/10.0.10586": {
+        "type": "package",
+        "compile": {
+          "lib/net40/System.Management.Automation.dll": {}
+        },
+        "runtime": {
+          "lib/net40/System.Management.Automation.dll": {}
         }
       }
     }
@@ -458,6 +480,18 @@
         "microsoft.openapi.nuspec"
       ]
     },
+    "OpenXmlPowerTools/4.5.3.2": {
+      "sha512": "F0HxQxh5+ZL5lOhkddrIozQj2ml0Zzwp25P5teEDmT8iyj++ZpeXf7c6aYqvHH1A9uULyayKVUUYhLi7+55pFw==",
+      "type": "package",
+      "path": "openxmlpowertools/4.5.3.2",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "lib/net45/OpenXmlPowerTools.dll",
+        "openxmlpowertools.4.5.3.2.nupkg.sha512",
+        "openxmlpowertools.nuspec"
+      ]
+    },
     "Swashbuckle.AspNetCore/7.3.1": {
       "sha512": "6u8w+UXp/sF89xQjfydWw6znQrUpbpFOmEIs8ODE+S0bV+mCQ9dNP4mk+HRsGHylpDaP5KSYSCEfFSgluLXHsA==",
       "type": "package",
@@ -572,12 +606,25 @@
         "system.io.packaging.nuspec",
         "useSharedDesignerContext.txt"
       ]
+    },
+    "System.Management.Automation.dll/10.0.10586": {
+      "sha512": "eknkOPXmlrZ6gXNfmkkLFrhbopXcU815BCaxTVHiY44UtTpA/zm8EKy4uCyb4HicITf5S8FA/9WiXeLdBXusBA==",
+      "type": "package",
+      "path": "system.management.automation.dll/10.0.10586",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "lib/net40/System.Management.Automation.dll",
+        "system.management.automation.dll.10.0.10586.nupkg.sha512",
+        "system.management.automation.dll.nuspec"
+      ]
     }
   },
   "projectFileDependencyGroups": {
     "net9.0": [
       "DiffMatchPatch >= 4.0.0",
       "DocumentFormat.OpenXml >= 3.2.0",
+      "OpenXmlPowerTools >= 4.5.3.2",
       "Swashbuckle.AspNetCore >= 7.3.1"
     ]
   },
@@ -632,6 +679,10 @@
             "target": "Package",
             "version": "[3.2.0, )"
           },
+          "OpenXmlPowerTools": {
+            "target": "Package",
+            "version": "[4.5.3.2, )"
+          },
           "Swashbuckle.AspNetCore": {
             "target": "Package",
             "version": "[7.3.1, )"
@@ -656,8 +707,30 @@
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.200/PortableRuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.201/PortableRuntimeIdentifierGraph.json"
       }
     }
-  }
+  },
+  "logs": [
+    {
+      "code": "NU1701",
+      "level": "Warning",
+      "warningLevel": 1,
+      "message": "Il pacchetto 'OpenXmlPowerTools 4.5.3.2' è stato ripristinato mediante '.NETFramework,Version=v4.6.1, .NETFramework,Version=v4.6.2, .NETFramework,Version=v4.7, .NETFramework,Version=v4.7.1, .NETFramework,Version=v4.7.2, .NETFramework,Version=v4.8, .NETFramework,Version=v4.8.1' e non mediante il framework di destinazione del progetto 'net9.0'. Questo pacchetto potrebbe non essere completamente compatibile con il progetto.",
+      "libraryId": "OpenXmlPowerTools",
+      "targetGraphs": [
+        "net9.0"
+      ]
+    },
+    {
+      "code": "NU1701",
+      "level": "Warning",
+      "warningLevel": 1,
+      "message": "Il pacchetto 'System.Management.Automation.dll 10.0.10586' è stato ripristinato mediante '.NETFramework,Version=v4.6.1, .NETFramework,Version=v4.6.2, .NETFramework,Version=v4.7, .NETFramework,Version=v4.7.1, .NETFramework,Version=v4.7.2, .NETFramework,Version=v4.8, .NETFramework,Version=v4.8.1' e non mediante il framework di destinazione del progetto 'net9.0'. Questo pacchetto potrebbe non essere completamente compatibile con il progetto.",
+      "libraryId": "System.Management.Automation.dll",
+      "targetGraphs": [
+        "net9.0"
+      ]
+    }
+  ]
 }
