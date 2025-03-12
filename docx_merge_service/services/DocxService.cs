@@ -280,8 +280,8 @@ namespace DocxMergeService.Services
             var run = new Run(new Text(paragraphText) { Space = SpaceProcessingModeValues.Preserve });
             var ins = new InsertedRun
             {
-                Author = "GPT-4 Correction",
-                Date = DateTime.UtcNow
+                //Author = "GPT-4 Correction",
+                //Date = DateTime.UtcNow
             };
             ins.Append(run);
             para.AppendChild(ins);
