@@ -1,3 +1,0 @@
-﻿<Project>
-  <Import Project="..\build\docx_merge_service.props" />
-</Project>
