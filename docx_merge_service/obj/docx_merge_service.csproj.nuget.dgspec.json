@@ -44,6 +44,10 @@
         "net9.0": {
           "targetAlias": "net9.0",
           "dependencies": {
+            "Codeuctivity.OpenXmlPowerTools": {
+              "target": "Package",
+              "version": "[8.0.314, )"
+            },
             "DiffMatchPatch": {
               "target": "Package",
               "version": "[4.0.0, )"
@@ -51,10 +55,6 @@
             "DocumentFormat.OpenXml": {
               "target": "Package",
               "version": "[3.2.0, )"
-            },
-            "OpenXmlPowerTools": {
-              "target": "Package",
-              "version": "[4.5.3.2, )"
             },
             "Swashbuckle.AspNetCore": {
               "target": "Package",

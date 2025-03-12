@@ -36,3 +36,6 @@ C:\Users\Youcanprint1\Desktop\AI\ycp_pfr\docx_merge_service\obj\Debug\net9.0\doc
 C:\Users\Youcanprint1\Desktop\AI\ycp_pfr\docx_merge_service\obj\Debug\net9.0\ref\docx_merge_service.dll
 C:\Users\Youcanprint1\Desktop\AI\ycp_pfr\docx_merge_service\bin\Debug\net9.0\DiffMatchPatch.dll
 C:\Users\Youcanprint1\Desktop\AI\ycp_pfr\docx_merge_service\bin\Debug\net9.0\DocumentFormat.OpenXml.Framework.dll
+C:\Users\Youcanprint1\Desktop\AI\ycp_pfr\docx_merge_service\bin\Debug\net9.0\Codeuctivity.OpenXmlPowerTools.dll
+C:\Users\Youcanprint1\Desktop\AI\ycp_pfr\docx_merge_service\bin\Debug\net9.0\SixLabors.Fonts.dll
+C:\Users\Youcanprint1\Desktop\AI\ycp_pfr\docx_merge_service\bin\Debug\net9.0\SixLabors.ImageSharp.dll
