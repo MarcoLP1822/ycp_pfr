@@ -5,7 +5,7 @@ using System.Linq;
 using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Wordprocessing;
-using DiffMatchPatch; // From NuGet package "DiffMatchPatch"
+using DiffMatchPatch; // NuGet package: "DiffMatchPatch"
 using Microsoft.Extensions.Logging;
 
 namespace DocxMergeService.Services
@@ -31,15 +31,20 @@ namespace DocxMergeService.Services
         }
 
         /// <summary>
-        /// Merges the corrected text into the original DOCX while preserving run-level formatting.
+        /// Merges the corrected text into the original DOCX, preserving run-level formatting and skipping paragraphs
+        /// that are unchanged. Also enables Word's track revisions so that <w:ins> and <w:del> appear as real changes.
         /// 
-        /// 1) Enables track revisions.
-        /// 2) For each original paragraph, we do a "run-by-run" approach:
-        ///    - If # of paragraphs match, we only modify text in place.
-        ///    - If corrected text has extra paragraphs, we insert them as new.
-        ///    - If original has extra paragraphs, we mark them as deleted.
+        /// Steps:
+        /// 1) Enable track revisions.
+        /// 2) Split the corrected text into paragraphs.
+        /// 3) For each paragraph up to the minimum count:
+        ///    - Compare the entire original paragraph text (trimmed) to the corrected paragraph text (trimmed).
+        ///    - If identical, do nothing (skip changes).
+        ///    - If different, run the "run-by-run" approach to apply insert/delete on partial changes only.
+        /// 4) If corrected has more paragraphs, insert them as new paragraphs.
+        /// 5) If original has more paragraphs, mark them as deleted.
         /// 
-        /// Returns a MemoryStream with the final .docx containing real track changes.
+        /// Returns a MemoryStream with the final .docx containing track changes.
         /// </summary>
         public MemoryStream MergeDocument(MemoryStream originalStream, string correctedText)
         {
@@ -50,29 +55,44 @@ namespace DocxMergeService.Services
                 if (correctedText == null)
                     throw new ArgumentNullException(nameof(correctedText), "Corrected text cannot be null.");
 
-                _logger.LogInformation("Starting DOCX merge with run-by-run track changes.");
+                _logger.LogInformation("Starting DOCX merge with run-by-run track changes (with paragraph skip).");
                 originalStream.Position = 0;
 
                 using (var wordDoc = LoadDocument(originalStream))
                 {
+                    // 1) Enable track revisions
                     EnableTrackRevisions(wordDoc);
 
                     var body = wordDoc.MainDocumentPart?.Document?.Body;
                     if (body == null)
                         throw new Exception("Invalid DOCX structure: Missing document body.");
 
-                    // Split corrected text into paragraphs
+                    // 2) Split corrected text into paragraphs
                     var correctedParagraphs = correctedText.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
                     var originalParagraphs = body.Elements<Paragraph>().ToList();
 
                     int commonCount = Math.Min(originalParagraphs.Count, correctedParagraphs.Length);
 
-                    // Update each paragraph in place (run by run)
+                    // 3) Process each paragraph in the overlapping range
                     for (int i = 0; i < commonCount; i++)
                     {
                         var origPara = originalParagraphs[i];
-                        var correctedParaText = correctedParagraphs[i];
-                        UpdateParagraphRunByRun(origPara, correctedParaText);
+                        var correctedPara = correctedParagraphs[i];
+
+                        // Gather full text of the original paragraph and trim both
+                        string originalParaText = GetFullParagraphText(origPara).Trim();
+                        correctedPara = correctedPara.Trim();
+
+                        // If identical, skip changes entirely
+                        if (originalParaText == correctedPara)
+                        {
+                            // Do nothing => paragraph remains as is, no track changes
+                        }
+                        else
+                        {
+                            // The run-by-run approach for partial changes
+                            UpdateParagraphRunByRun(origPara, correctedPara);
+                        }
                     }
 
                     // If corrected has more paragraphs, insert them as new
@@ -92,15 +112,16 @@ namespace DocxMergeService.Services
                     wordDoc.MainDocumentPart.Document.Save();
                 }
 
+                // Return final doc
                 var mergedStream = new MemoryStream(originalStream.ToArray());
                 mergedStream.Position = 0;
 
-                _logger.LogInformation("DOCX merge with run-by-run track changes completed successfully.");
+                _logger.LogInformation("DOCX merge with run-by-run track changes and paragraph skip completed successfully.");
                 return mergedStream;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error during run-by-run DOCX merge.");
+                _logger.LogError(ex, "Error during run-by-run DOCX merge (with paragraph skip).");
                 throw;
             }
         }
@@ -126,16 +147,10 @@ namespace DocxMergeService.Services
         }
 
         /// <summary>
-        /// Edits a single paragraph in place, run by run.
+        /// Edits a single paragraph in place, run by run. For each original run, we diff with the
+        /// "remaining" corrected text, then build <w:ins> / <w:del> for changed text only.
         /// 
-        /// For each run:
-        ///  1) Compare original run text to the portion of corrected text that remains.
-        ///  2) Use diff-match-patch to see how that run changed.
-        ///  3) Build <w:ins> or <w:del> only for changed segments; keep the rest as is.
-        /// 
-        /// After we finish each run, we advance the corrected-text index by however many "equal" or "insert" chars we used.
-        /// If corrected text is shorter, leftover run text is marked as <w:del>.
-        /// If corrected text is longer, leftover text at the end is <w:ins>.
+        /// We also call diff_cleanupSemantic to reduce spurious small insert/delete pairs.
         /// </summary>
         private void UpdateParagraphRunByRun(Paragraph paragraph, string correctedParaText)
         {
@@ -145,7 +160,7 @@ namespace DocxMergeService.Services
             // We'll create a new list of child elements that represent the updated content
             var newChildren = new List<OpenXmlElement>();
 
-            // We'll keep a "cursor" into the correctedParaText
+            // "Cursor" into the correctedParaText
             int correctedIndex = 0;
             int correctedLength = correctedParaText.Length;
 
@@ -155,25 +170,22 @@ namespace DocxMergeService.Services
                 string runText = string.Concat(run.Elements<Text>().Select(t => t.Text));
                 var runProps = run.RunProperties?.CloneNode(true) as RunProperties;
 
-                // If there's no text in the run, skip it
+                // If there's no text in the run, just copy it over
                 if (string.IsNullOrEmpty(runText))
                 {
-                    // Just re-append it if there's no actual text
                     newChildren.Add(run.CloneNode(true));
                     continue;
                 }
 
-                // We'll diff this run's text vs. the "remaining" corrected text
-                // The "remaining" corrected text is correctedParaText.Substring(correctedIndex)
-                // But we don't know how far to go. We'll just diff the entire remainder.
+                // Diff this run's text vs. the remainder of the corrected text
                 var dmp = new diff_match_patch();
                 string correctedRemainder = correctedParaText.Substring(correctedIndex);
                 var diffs = dmp.diff_main(runText, correctedRemainder, false);
-                // Optional cleanup
-                //dmp.diff_cleanupEfficiency(diffs);
 
-                // We'll parse the diffs to build new runs
-                int localCorrectedUsed = 0; // how many characters from correctedRemainder we used
+                // Clean up small trivial diffs
+                dmp.diff_cleanupSemantic(diffs);
+
+                int localCorrectedUsed = 0;
 
                 foreach (var diff in diffs)
                 {
@@ -182,7 +194,7 @@ namespace DocxMergeService.Services
 
                     if (op == Operation.EQUAL)
                     {
-                        // This text is unchanged => same run properties, no <w:ins>/<w:del>
+                        // unchanged => same run properties, no <w:ins>/<w:del>
                         var runElement = new Run();
                         if (runProps != null)
                             runElement.RunProperties = (RunProperties)runProps.CloneNode(true);
@@ -198,7 +210,7 @@ namespace DocxMergeService.Services
                         // This text was removed => <w:del>
                         var delRun = BuildDeletedRun(text, runProps);
                         newChildren.Add(delRun);
-                        // No consumption from corrected text (since it's a removal)
+                        // No consumption from corrected text
                     }
                     else if (op == Operation.INSERT)
                     {
@@ -206,7 +218,6 @@ namespace DocxMergeService.Services
                         var insRun = BuildInsertedRun(text, runProps);
                         newChildren.Add(insRun);
 
-                        // We consumed "text.Length" from the corrected side
                         localCorrectedUsed += text.Length;
                     }
                 }
@@ -217,7 +228,7 @@ namespace DocxMergeService.Services
                     correctedIndex = correctedLength;
             }
 
-            // If there's leftover corrected text that wasn't matched to any original run => <w:ins>
+            // If there's leftover corrected text => <w:ins>
             if (correctedIndex < correctedLength)
             {
                 string leftover = correctedParaText.Substring(correctedIndex);
@@ -226,9 +237,8 @@ namespace DocxMergeService.Services
                 correctedIndex = correctedLength;
             }
 
-            // Now remove the old runs from the paragraph, replace with newChildren
+            // Replace old runs with newChildren
             paragraph.RemoveAllChildren<Run>();
-            // (Optionally remove old Bookmarks if you want)
             paragraph.RemoveAllChildren<BookmarkStart>();
             paragraph.RemoveAllChildren<BookmarkEnd>();
 
@@ -319,6 +329,18 @@ namespace DocxMergeService.Services
                 delRun.Append(run);
                 run.Remove();
             }
+        }
+
+        /// <summary>
+        /// Concatenates all text from the runs in a paragraph into a single string.
+        /// </summary>
+        private string GetFullParagraphText(Paragraph p)
+        {
+            return string.Concat(
+                p.Elements<Run>()
+                 .SelectMany(r => r.Elements<Text>())
+                 .Select(t => t.Text)
+            );
         }
 
         // ----------------------------------------------------------------
