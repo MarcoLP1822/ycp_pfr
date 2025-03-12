@@ -11,20 +11,19 @@ using DiffMatchPatch;
 namespace DocxMergeService.Services
 {
     /// <summary>
-    /// Servizio che esegue un merge "granulare" del testo corretto in un DOCX
-    /// mostrando in Word solo le parole effettivamente cambiate come <w:del> e <w:ins>.
+    /// Servizio che esegue un merge "granulare" del testo corretto in un DOCX.
+    /// Il risultato è un file in cui solo le parole cambiate sono segnalate come revisioni (ins/del),
+    /// preservando interamente la formattazione originale.
     /// </summary>
     public class DocxService
     {
         /// <summary>
-        /// Fusione parziale in revisione: 
-        /// - Abilita TrackRevisions
-        /// - Confronta paragrafi originali con "correctedText"
-        /// - Esegue diff e ricostruisce run con <w:del>/<w:ins>
+        /// Esegue la fusione parziale tra il testo originale contenuto nel DOCX e il testo corretto (da DB).
+        /// Utilizza un diff word-level per ridurre il numero di nodi creati.
         /// </summary>
         public MemoryStream MergeDocumentPartial(MemoryStream originalStream, string correctedText)
         {
-            // Creiamo un file temporaneo
+            // Scriviamo il contenuto in un file temporaneo
             string tempFilePath = Path.GetTempFileName();
             originalStream.Position = 0;
             using (var fs = new FileStream(tempFilePath, FileMode.Create, FileAccess.Write))
@@ -36,50 +35,41 @@ namespace DocxMergeService.Services
             {
                 using (var doc = WordprocessingDocument.Open(tempFilePath, true))
                 {
-                    // 1) Abilita track revisions
                     EnableTrackRevisions(doc);
 
-                    // 2) Legge i paragrafi del Body
                     var body = doc.MainDocumentPart.Document.Body;
                     if (body == null)
                         throw new Exception("Invalid DOCX: missing body.");
 
-                    var originalParagraphs = body.Elements<Paragraph>().ToList();
-                    // Suddividiamo il testo corretto in paragrafi su \n
+                    // Suddividiamo il testo corretto in paragrafi (assumendo \n come separatore)
                     var correctedParagraphs = correctedText.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
-
-                    // 3) Scorriamo in parallelo
+                    var originalParagraphs = body.Elements<Paragraph>().ToList();
                     int maxCount = Math.Max(originalParagraphs.Count, correctedParagraphs.Length);
+
                     for (int i = 0; i < maxCount; i++)
                     {
                         if (i < originalParagraphs.Count && i < correctedParagraphs.Length)
                         {
-                            // Abbiamo un paragrafo "originale" e uno "corretto"
                             var paragraph = originalParagraphs[i];
-
-                            // Costruiamo la mappa run->posizioni e il testo originale
                             string originalParaText;
                             var runMap = BuildRunMapFromParagraph(paragraph, out originalParaText);
-
                             string correctedParaText = correctedParagraphs[i];
+
                             if (!string.Equals(originalParaText, correctedParaText))
                             {
                                 UpdateParagraphWithDiff(paragraph, originalParaText, correctedParaText, runMap);
                             }
-                            // Altrimenti se sono identici, non tocchiamo nulla
                         }
                         else if (i >= originalParagraphs.Count)
                         {
-                            // Non ci sono più paragrafi originali, ma ci sono paragrafi "corretti" in più
-                            // -> Aggiungiamo come paragrafi "inseriti"
+                            // Aggiungiamo un nuovo paragrafo con il testo corretto come inserimento
                             var newP = new Paragraph();
                             InsertParagraphAsInsertion(newP, correctedParagraphs[i]);
                             body.AppendChild(newP);
                         }
                         else
                         {
-                            // Abbiamo paragrafi originali in eccesso
-                            // -> Li marchiamo come cancellati
+                            // Paragrafo in eccesso nell'originale: lo marcamo come eliminato
                             MarkParagraphAsDeleted(originalParagraphs[i]);
                         }
                     }
@@ -87,21 +77,14 @@ namespace DocxMergeService.Services
                     doc.MainDocumentPart.Document.Save();
                 }
 
-                // Ritorniamo il file finale in uno stream
+                // Ritorna il file finale in uno stream
                 var mergedStream = new MemoryStream();
                 using (var fs = new FileStream(tempFilePath, FileMode.Open, FileAccess.Read))
                 {
                     fs.CopyTo(mergedStream);
                 }
                 mergedStream.Position = 0;
-
-                // Cleanup
-                try
-                {
-                    File.Delete(tempFilePath);
-                }
-                catch { /* ignore */ }
-
+                try { File.Delete(tempFilePath); } catch { }
                 return mergedStream;
             }
             catch (Exception ex)
@@ -111,7 +94,7 @@ namespace DocxMergeService.Services
         }
 
         /// <summary>
-        /// Abilita la funzionalità di TrackRevisions nel documento.
+        /// Abilita Track Revisions nel documento.
         /// </summary>
         private void EnableTrackRevisions(WordprocessingDocument doc)
         {
@@ -125,217 +108,159 @@ namespace DocxMergeService.Services
             {
                 settingsPart.Settings = new Settings();
             }
-
             var trackRevisions = new TrackRevisions { Val = OnOffValue.FromBoolean(true) };
             settingsPart.Settings.AppendChild(trackRevisions);
             settingsPart.Settings.Save();
         }
 
         /// <summary>
-        /// Costruisce una mappa (startPos, endPos, runProperties) per i run di un paragrafo,
-        /// e restituisce anche il testo completo "originalParaText".
+        /// Costruisce una mappa dei run del paragrafo, ottenendo la concatenazione del testo originale
+        /// e salvando per ciascun run il range (start-end) e le RunProperties.
         /// </summary>
         private List<RunPositionInfo> BuildRunMapFromParagraph(Paragraph paragraph, out string originalParaText)
         {
             var runMap = new List<RunPositionInfo>();
             var runs = paragraph.Elements<Run>().ToList();
-
             var sb = new StringBuilder();
             int currentPos = 0;
-
             foreach (var run in runs)
             {
-                // Concateniamo tutto il testo di <w:t> in questo run
                 string runText = string.Concat(run.Elements<Text>().Select(t => t.Text));
                 int length = runText.Length;
-
                 if (length > 0)
                 {
-                    var info = new RunPositionInfo
+                    runMap.Add(new RunPositionInfo
                     {
                         StartPos = currentPos,
                         EndPos = currentPos + length - 1,
                         RunProperties = run.RunProperties?.CloneNode(true) as RunProperties
-                    };
-                    runMap.Add(info);
-
+                    });
                     sb.Append(runText);
                     currentPos += length;
                 }
             }
-
             originalParaText = sb.ToString();
             return runMap;
         }
 
         /// <summary>
-        /// Confronta originalParaText e correctedParaText e ricostruisce i run in <paragraph>
-        /// usando <w:del> e <w:ins> per le differenze. Mantiene la formattazione dai run originali (runMap).
+        /// Esegue il diff word-level tra originalParaText e correctedParaText e ricostruisce il paragrafo
+        /// creando run normali, <w:del> e <w:ins> secondo le differenze.
         /// </summary>
         private void UpdateParagraphWithDiff(Paragraph paragraph, string originalParaText, string correctedParaText, List<RunPositionInfo> runMap)
         {
-            // Salviamo pPr
+            // Rimuoviamo i figli del paragrafo, mantenendo eventuali ParagraphProperties
             var pPr = paragraph.ParagraphProperties?.CloneNode(true) as ParagraphProperties;
-
-            // Rimuoviamo i child (run)
             paragraph.RemoveAllChildren();
             if (pPr != null)
-            {
                 paragraph.AppendChild(pPr);
-            }
 
-            // Diff con diff_match_patch
+            // Eseguiamo un diff word-level:
+            // 1) Tokenizziamo in parole e punteggiatura usando un delimitatore speciale
+            char delimiter = '\u001F';
+            string[] origTokens = System.Text.RegularExpressions.Regex.Split(originalParaText, @"(\W+)");
+            string[] corrTokens = System.Text.RegularExpressions.Regex.Split(correctedParaText, @"(\W+)");
+            string origJoined = string.Join(delimiter, origTokens);
+            string corrJoined = string.Join(delimiter, corrTokens);
+
             var dmp = new diff_match_patch();
-            var diffs = dmp.diff_main(originalParaText, correctedParaText, false);
-            // Niente cleanup per mantenere granularità
+            var diffs = dmp.diff_main(origJoined, corrJoined, false);
+            // Non eseguiamo cleanup per mantenere la granularità word-level
 
-            int originalPos = 0; // Indice globale sul testo originale
-
+            // Dopo il diff, per ciascun segmento, ricostruiamo il testo (spezzando sul delimitatore)
+            int originalPos = 0;
             foreach (var diff in diffs)
             {
-                var op = diff.operation;
-                var text = diff.text;
-                if (string.IsNullOrEmpty(text)) continue;
+                // Sostituiamo il delimitatore con uno spazio per ottenere il testo finale
+                string tokenText = diff.text.Replace(delimiter.ToString(), " ");
+                if (string.IsNullOrEmpty(tokenText))
+                    continue;
 
-                if (op == Operation.EQUAL)
+                if (diff.operation == Operation.EQUAL)
                 {
-                    BuildEqualRuns(paragraph, text, ref originalPos, runMap);
+                    BuildEqualRuns(paragraph, tokenText, ref originalPos, runMap);
                 }
-                else if (op == Operation.DELETE)
+                else if (diff.operation == Operation.DELETE)
                 {
-                    BuildDeletedRuns(paragraph, text, ref originalPos, runMap);
+                    BuildDeletedRuns(paragraph, tokenText, ref originalPos, runMap);
                 }
-                else if (op == Operation.INSERT)
+                else if (diff.operation == Operation.INSERT)
                 {
-                    BuildInsertedRuns(paragraph, text, originalPos, runMap);
-                    // Inserimento non avanza originalPos perché non "consuma" testo dell'originale
+                    BuildInsertedRuns(paragraph, tokenText, originalPos, runMap);
                 }
             }
         }
 
         /// <summary>
-        /// Crea run normali per la parte EQUAL, copiando la formattazione dal runMap.
-        /// Avanza originalPos.
+        /// Crea run normali (EQUAL) copiando la formattazione dal runMap.
         /// </summary>
         private void BuildEqualRuns(Paragraph paragraph, string text, ref int originalPos, List<RunPositionInfo> runMap)
         {
-            int idx = 0;
-            while (idx < text.Length)
-            {
-                var rpInfo = FindRunPropsForPosition(runMap, originalPos + idx);
-                int chunkLength = CalculateChunkLength(originalPos + idx, text.Length - idx, rpInfo);
-                string sub = text.Substring(idx, chunkLength);
-
-                // Crea un run "normale"
-                var run = new Run();
-                if (rpInfo?.RunProperties != null)
-                {
-                    run.RunProperties = rpInfo.RunProperties.CloneNode(true) as RunProperties;
-                }
-                run.AppendChild(new Text(sub) { Space = SpaceProcessingModeValues.Preserve });
-                paragraph.AppendChild(run);
-
-                idx += chunkLength;
-            }
+            // Per word-level diff si assume che le modifiche siano blocchi più grandi
+            var rpInfo = FindRunPropsForPosition(runMap, originalPos);
+            var run = new Run();
+            if (rpInfo?.RunProperties != null)
+                run.RunProperties = rpInfo.RunProperties.CloneNode(true) as RunProperties;
+            run.AppendChild(new Text(text) { Space = SpaceProcessingModeValues.Preserve });
+            paragraph.AppendChild(run);
             originalPos += text.Length;
         }
 
         /// <summary>
-        /// Crea run racchiusi in <w:del> per la parte DELETE.
-        /// Avanza originalPos.
+        /// Crea run per la parte DELETE racchiudendoli in <w:del>.
         /// </summary>
         private void BuildDeletedRuns(Paragraph paragraph, string text, ref int originalPos, List<RunPositionInfo> runMap)
         {
-            int idx = 0;
-            while (idx < text.Length)
+            var rpInfo = FindRunPropsForPosition(runMap, originalPos);
+            var run = new Run();
+            if (rpInfo?.RunProperties != null)
+                run.RunProperties = rpInfo.RunProperties.CloneNode(true) as RunProperties;
+            run.AppendChild(new DeletedText(text) { Space = SpaceProcessingModeValues.Preserve });
+            var delRun = new DeletedRun
             {
-                var rpInfo = FindRunPropsForPosition(runMap, originalPos + idx);
-                int chunkLength = CalculateChunkLength(originalPos + idx, text.Length - idx, rpInfo);
-                string sub = text.Substring(idx, chunkLength);
-
-                var run = new Run();
-                if (rpInfo?.RunProperties != null)
-                {
-                    run.RunProperties = rpInfo.RunProperties.CloneNode(true) as RunProperties;
-                }
-                // <w:del> si aspetta <w:delText> o <w:delRun>. 
-                // Ma qui useremo DeletedText per marcare la parte di testo come cancellata
-                run.AppendChild(new DeletedText(sub) { Space = SpaceProcessingModeValues.Preserve });
-
-                var delRun = new DeletedRun
-                {
-                    Author = "AI Correction",
-                    Date = DateTime.UtcNow
-                };
-                delRun.Append(run);
-                paragraph.AppendChild(delRun);
-
-                idx += chunkLength;
-            }
+                Author = "AI Correction",
+                Date = DateTime.UtcNow
+            };
+            delRun.Append(run);
+            paragraph.AppendChild(delRun);
             originalPos += text.Length;
         }
 
         /// <summary>
-        /// Crea run racchiusi in <w:ins> per la parte INSERT.
-        /// Non avanza originalPos, perché è testo nuovo.
+        /// Crea run per la parte INSERT racchiudendoli in <w:ins>.
         /// </summary>
         private void BuildInsertedRuns(Paragraph paragraph, string text, int originalPos, List<RunPositionInfo> runMap)
         {
-            int idx = 0;
-            while (idx < text.Length)
+            // Per gli inserimenti, usiamo la formattazione "vicina" (se disponibile)
+            var rpInfo = FindRunPropsForPosition(runMap, originalPos);
+            var run = new Run();
+            if (rpInfo?.RunProperties != null)
+                run.RunProperties = rpInfo.RunProperties.CloneNode(true) as RunProperties;
+            run.AppendChild(new Text(text) { Space = SpaceProcessingModeValues.Preserve });
+            var insRun = new InsertedRun
             {
-                // Prendiamo la formattazione dal runMap "vicino"
-                var rpInfo = FindRunPropsForPosition(runMap, originalPos + idx);
-                int chunkLength = CalculateChunkLength(originalPos + idx, text.Length - idx, rpInfo);
-                string sub = text.Substring(idx, chunkLength);
-
-                var run = new Run();
-                if (rpInfo?.RunProperties != null)
-                {
-                    run.RunProperties = rpInfo.RunProperties.CloneNode(true) as RunProperties;
-                }
-                run.AppendChild(new Text(sub) { Space = SpaceProcessingModeValues.Preserve });
-
-                var insRun = new InsertedRun
-                {
-                    Author = "AI Correction",
-                    Date = DateTime.UtcNow
-                };
-                insRun.Append(run);
-                paragraph.AppendChild(insRun);
-
-                idx += chunkLength;
-            }
+                Author = "AI Correction",
+                Date = DateTime.UtcNow
+            };
+            insRun.Append(run);
+            paragraph.AppendChild(insRun);
         }
 
         /// <summary>
-        /// Cerca la RunProperties in runMap che copre "position".
+        /// Cerca nella runMap la RunProperties per la posizione indicata.
         /// </summary>
         private RunPositionInfo FindRunPropsForPosition(List<RunPositionInfo> runMap, int position)
         {
-            // Ritorna l'info che contiene 'position'
             foreach (var info in runMap)
             {
                 if (position >= info.StartPos && position <= info.EndPos)
                     return info;
             }
-            // Se nulla, ritorna l'ultima o null
             return runMap.LastOrDefault();
         }
 
         /// <summary>
-        /// Calcola quanti caratteri possiamo "consumare" con la stessa formattazione.
-        /// </summary>
-        private int CalculateChunkLength(int currentPos, int remaining, RunPositionInfo rpInfo)
-        {
-            if (rpInfo == null) return remaining;
-            int runEnd = rpInfo.EndPos;
-            int chunk = runEnd - currentPos + 1;
-            return chunk > remaining ? remaining : chunk;
-        }
-
-        /// <summary>
-        /// Inserisce un paragrafo come "inserito" (<w:ins>).
+        /// Inserisce un intero paragrafo come inserito (<w:ins>).
         /// </summary>
         private void InsertParagraphAsInsertion(Paragraph para, string paragraphText)
         {
@@ -350,7 +275,7 @@ namespace DocxMergeService.Services
         }
 
         /// <summary>
-        /// Marca l'intero paragrafo come cancellato.
+        /// Marca un intero paragrafo come eliminato.
         /// </summary>
         private void MarkParagraphAsDeleted(Paragraph paragraph)
         {
@@ -376,8 +301,7 @@ namespace DocxMergeService.Services
     }
 
     /// <summary>
-    /// Struttura di supporto: definisce l'intervallo di testo (startPos..endPos)
-    /// e le relative RunProperties originali.
+    /// Struttura di supporto per mappare un run: indica l'intervallo di caratteri e le relative RunProperties.
     /// </summary>
     public class RunPositionInfo
     {

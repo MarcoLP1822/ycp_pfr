@@ -22,8 +22,8 @@ namespace DocxMergeService.Controllers
         }
 
         /// <summary>
-        /// Endpoint che riceve un file DOCX e il testo corretto
-        /// e restituisce un DOCX con modifiche granulari in revisione.
+        /// Riceve un file DOCX e il testo corretto (tutto in un’unica stringa, suddiviso in paragrafi con \n)
+        /// e restituisce un DOCX con le sole modifiche (a livello di parola) evidenziate in Track Changes.
         /// </summary>
         [HttpPost]
         public async Task<IActionResult> Merge([FromForm] IFormFile file, [FromForm] string correctedText)
@@ -34,7 +34,7 @@ namespace DocxMergeService.Controllers
                 return BadRequest(new { error = "Both file and correctedText are required." });
             }
 
-            // Verifica MIME type DOCX
+            // Verifica che il file sia un DOCX
             if (!file.ContentType.Equals("application/vnd.openxmlformats-officedocument.wordprocessingml.document", StringComparison.OrdinalIgnoreCase))
             {
                 _logger.LogError($"Invalid file type: {file.ContentType}");
@@ -47,10 +47,10 @@ namespace DocxMergeService.Controllers
                 await file.CopyToAsync(memoryStream);
                 memoryStream.Position = 0;
 
-                // Verifica struttura
+                // Verifica struttura del DOCX
                 try
                 {
-                    using (WordprocessingDocument.Open(memoryStream, false)) { /* Se non lancia eccezioni è valido */ }
+                    using (WordprocessingDocument.Open(memoryStream, false)) { }
                     memoryStream.Position = 0;
                 }
                 catch (Exception ex)
@@ -62,7 +62,6 @@ namespace DocxMergeService.Controllers
                 // Esegui il merge parziale in revisione
                 var mergedDocStream = _docxService.MergeDocumentPartial(memoryStream, correctedText);
 
-                // Restituisce il file DOCX finale
                 return File(mergedDocStream.ToArray(),
                     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                     "proofread-merged.docx");
