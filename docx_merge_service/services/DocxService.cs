@@ -170,7 +170,7 @@ namespace DocxMergeService.Services
                 string correctedRemainder = correctedParaText.Substring(correctedIndex);
                 var diffs = dmp.diff_main(runText, correctedRemainder, false);
                 // Optional cleanup
-                dmp.diff_cleanupEfficiency(diffs);
+                //dmp.diff_cleanupEfficiency(diffs);
 
                 // We'll parse the diffs to build new runs
                 int localCorrectedUsed = 0; // how many characters from correctedRemainder we used
