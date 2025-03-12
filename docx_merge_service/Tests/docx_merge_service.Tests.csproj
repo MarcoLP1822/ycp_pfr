@@ -1,22 +1,47 @@
-<Project Sdk="Microsoft.NET.Sdk">
+/**
+ * @file docx_merge_service/docx_merge_service.csproj
+ * @description
+ * This file defines the .NET project configuration for the docx_merge_service.
+ * It specifies target framework, nullable reference types, package references,
+ * and any compile exclusions.
+ *
+ * Key features:
+ * - Targets .NET 9.0 with ASP.NET Core capabilities.
+ * - Enables nullable reference checking (Nullable=enable).
+ * - Lists all required package references for the docx_merge_service, including:
+ *   - DiffMatchPatch (currently used in older merging logic).
+ *   - DocumentFormat.OpenXml for handling DOCX files.
+ *   - Swashbuckle.AspNetCore for Swagger.
+ *   - OpenXmlPowerTools (newly added) for WmlComparer and advanced DOCX comparison.
+ *
+ * @notes
+ * - The new package reference "OpenXmlPowerTools" (version 4.5.3) is added
+ *   to support the compare-based approach in the next steps.
+ * - The <Compile Remove="Tests\**\*.cs" /> item group excludes test files
+ *   from the main build (they are compiled in the test project).
+ * - After modifying this file, a 'dotnet restore' is required to download
+ *   the new package.
+ */
+
+<Project Sdk="Microsoft.NET.Sdk.Web">
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
-    <IsPackable>false</IsPackable>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="xunit" Version="2.4.2" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="2.4.5" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.5.0" />
+    <!-- Existing references -->
+    <PackageReference Include="DiffMatchPatch" Version="4.0.0" />
     <PackageReference Include="DocumentFormat.OpenXml" Version="3.2.0" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="7.3.1" />
+
+    <!-- Newly added reference for WmlComparer / OpenXmlPowerTools -->
+    <PackageReference Include="OpenXmlPowerTools" Version="4.5.3" />
   </ItemGroup>
 
+  <!-- Exclude test files from the main build -->
   <ItemGroup>
-    <ProjectReference Include="..\docx_merge_service.csproj" />
-  </ItemGroup>
-
-  <!-- Include all test files from the Tests folder of the main project -->
-  <ItemGroup>
-    <Compile Include="..\docx_merge_service\Tests\**\*.cs" />
+    <Compile Remove="Tests\**\*.cs" />
   </ItemGroup>
 </Project>
