@@ -10,8 +10,7 @@
         "format": "prettier --write .",
         "db:generate": "drizzle-kit generate",
         "db:migrate": "drizzle-kit migrate",
-        "test": "jest",
-        "deploy": "vercel --prod"
+        "test": "jest"
     },
     "dependencies": {
         "@emotion/react": "^11.14.0",

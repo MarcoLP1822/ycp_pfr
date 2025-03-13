@@ -1,105 +1,160 @@
-# Web Proofreading App
+# YCP_PFR
 
-## Overview
+## Panoramica
 
-The Web Proofreading App is a modern, minimalistic web application that allows users to upload editable text-based documents (doc, docx, odf, txt) for proofreading. The app leverages an AI-powered language model to scan, proofread, and correct text. It highlights inline corrections and enables users to accept corrections individually or in bulk. Additionally, the system maintains version control to allow rollbacks of changes.
+YCP_PFR è un'applicazione web moderna e minimalista che consente agli utenti di caricare documenti basati su testo modificabili (doc, docx, odf, txt) per la correzione di bozze. L'app utilizza un modello linguistico basato su intelligenza artificiale per analizzare, correggere e migliorare i testi. Evidenzia le correzioni in linea e permette agli utenti di accettarle singolarmente o in blocco. Inoltre, il sistema mantiene un controllo delle versioni per consentire il ripristino delle modifiche precedenti.
 
-## Features
+## Funzionalità
 
-- **File Management:** 
-  - Upload, rename, and delete text-based documents.
-  - Initiate and monitor the proofreading process.
-- **Proofreading Engine:**
-  - AI-powered proofreading for grammar, punctuation, spelling, and orthography.
-  - Inline highlighting of corrections.
-- **Proofreading Interface:**
-  - Side-by-side view of original and corrected texts.
-  - Options to accept individual or bulk corrections.
-  - Version control for rollbacks.
-- **User Management & Security:**
-  - Secure authentication using Supabase Auth.
-  - Protected routes and database security with Supabase RLS.
-- **Modern Design:**
-  - Responsive, minimalistic UI built with Tailwind CSS.
+- **Gestione dei File:** 
+  - Caricamento, rinomina ed eliminazione di documenti basati su testo
+  - Avvio e monitoraggio del processo di correzione delle bozze
+  
+- **Motore di Correzione:**
+  - Correzione automatica basata su AI per grammatica, punteggiatura, ortografia e sintassi
+  - Evidenziazione inline delle correzioni suggerite
+  
+- **Interfaccia di Correzione:**
+  - Visualizzazione affiancata dei testi originali e corretti
+  - Opzioni per accettare correzioni singole o in blocco
+  - Controllo delle versioni per ripristinare modifiche precedenti
+  
+- **Gestione Utenti e Sicurezza:**
+  - Autenticazione sicura tramite Supabase Auth
+  - Protezione delle route e sicurezza del database con Supabase RLS (Row Level Security)
+  
+- **Design Moderno:**
+  - Interfaccia utente responsive e minimalista costruita con Tailwind CSS
 
-## Setup Instructions
+## Istruzioni per l'Installazione
 
-### Prerequisites
-- **Node.js** (v14 or later)
-- **npm** or **yarn**
+### Prerequisiti
+- **Node.js** (v14 o successivo)
+- **npm** o **yarn**
 - **Git**
 
-### Clone the Repository
+### Clonazione del Repository
 ```bash
-git clone https://github.com/your-username/web-proofreading-app.git
+git clone https://github.com/youcanprint1/web-proofreading-app.git
 cd web-proofreading-app
 ```
 
-### Install Dependencies
+### Installazione delle Dipendenze
 ```bash
 npm install
+# oppure
+yarn install
 ```
 
-### Configure Environment Variables
-Create a .env.local file in the root of the project and add the following variables:
+### Configurazione delle Variabili d'Ambiente
+Crea un file `.env.local` nella root del progetto e aggiungi le seguenti variabili:
+
 ```bash
-# OpenAI API Key for proofreading functionality
-OPENAI_API_KEY=your_openai_api_key
+# Chiave API OpenAI per la funzionalità di correzione
+OPENAI_API_KEY=la_tua_chiave_api_openai
 
-# JWT Secret for authentication
-JWT_SECRET=your_jwt_secret
+# Secret JWT per l'autenticazione
+JWT_SECRET=il_tuo_secret_jwt
 
-# Supabase configuration for Authentication, Storage, and Database
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+# Configurazione Supabase per Autenticazione, Storage e Database
+NEXT_PUBLIC_SUPABASE_URL=il_tuo_url_supabase
+NEXT_PUBLIC_SUPABASE_ANON_KEY=la_tua_chiave_anonima_supabase
 
-# PostgreSQL connection URL for Drizzle ORM migrations (if needed)
-DATABASE_URL=your_database_url
+# URL di connessione PostgreSQL per le migrazioni Drizzle ORM (se necessario)
+DATABASE_URL=il_tuo_url_database
 ```
-### Database Migrations
-To generate and apply database migrations using Drizzle ORM, run:
+
+### Migrazioni del Database
+Per generare e applicare le migrazioni del database utilizzando Drizzle ORM, esegui:
+
 ```bash
 npx drizzle-kit generate
 npx drizzle-kit migrate
 ```
 
-### Running the application locally
+### Esecuzione dell'Applicazione in Locale
 ```bash
 npm run dev
+# oppure
+yarn dev
 ```
-## Deployment Guidelines
-### Deploying to Vercel
-This project is pre-configured for deployment on Vercel.
 
-Push your changes to your GitHub repository.
-Log in to Vercel and import your repository.
-Set the environment variables in the Vercel dashboard (use the same values as in your .env.local file).
-Deploy the project. Vercel will automatically build and deploy your application.
-###   Alternative Deployment Options
-If deploying to another hosting provider:
+L'applicazione sarà disponibile all'indirizzo `http://localhost:3000`.
 
-Ensure that all environment variables are set correctly.
-The build command should be npm run build and the start command should be npm run start.
+## Linee Guida per il Deployment
+
+### Deployment su Render
+Questo progetto è ottimizzato per il deployment su Render:
+
+1. Crea un account su [Render](https://render.com/) se non ne hai già uno
+2. Dalla dashboard di Render, seleziona "New" e poi "Web Service"
+3. Collega il tuo repository GitHub o GitLab
+4. Configura il servizio con le seguenti impostazioni:
+   - **Nome**: YCP_PFR o un nome a tua scelta
+   - **Runtime**: Node
+   - **Build Command**: `npm install && npm run build`
+   - **Start Command**: `npm start`
+   - **Piano**: Seleziona il piano adeguato alle tue esigenze (Free per test, Standard per produzione)
+5. Nella sezione "Environment Variables", aggiungi tutte le variabili d'ambiente necessarie (stesse del file `.env.local`)
+6. Clicca su "Create Web Service" per avviare il deployment
+
+Render effettuerà automaticamente il build e il deployment dell'applicazione. Ogni push al repository collegato attiverà un nuovo deployment.
+
+### Configurazioni Avanzate su Render
+
+Per ottimizzare l'applicazione in produzione su Render:
+
+- **Auto-Scaling**: Nelle impostazioni del servizio, puoi configurare l'auto-scaling per gestire picchi di traffico
+- **Custom Domains**: Configura un dominio personalizzato nelle impostazioni del servizio
+- **Database Gestiti**: Render offre database PostgreSQL gestiti che puoi collegare facilmente alla tua applicazione
+- **Continuous Deployment**: Per ambienti di produzione, puoi configurare branch specifici o utilizzare webhook personalizzati
+
+### Opzioni Alternative di Deployment
+
+Se desideri fare il deployment su un altro provider di hosting:
+
+1. Assicurati che tutte le variabili d'ambiente siano impostate correttamente
+2. Il comando di build dovrebbe essere `npm run build` o `yarn build`
+3. Il comando di avvio dovrebbe essere `npm run start` o `yarn start`
+
+Alcune alternative popolari includono:
+- **Netlify**: Ottimo per applicazioni statiche o con funzioni serverless
+- **DigitalOcean App Platform**: Soluzione completa per applicazioni Node.js
+- **AWS Elastic Beanstalk**: Opzione robusta per scenari enterprise
+
 ## Testing
-This project uses Jest and React Testing Library for unit and integration tests.
+Questo progetto utilizza Jest e React Testing Library per i test unitari e di integrazione.
 
-Run tests using:
+Esegui i test utilizzando:
 
-bash
-Copia
+```bash
 npm run test
-Ensure that all necessary testing dependencies are installed.
+# oppure
+yarn test
+```
 
-## Future Enhancements
-Integration of additional LLM APIs for proofreading.
-Enhanced performance monitoring and logging.
-Support for additional file formats (e.g., PDF).
-Expanded version control features.
-## Troubleshooting
-Environment Variables: Double-check that all required environment variables are correctly set in .env.local or in your deployment provider's configuration.
-Database Migrations: Verify your DATABASE_URL and ensure your PostgreSQL instance is running if migrations fail.
-Deployment Issues: Review logs in your hosting provider's dashboard (e.g., Vercel) for any error messages.
+Assicurati che tutte le dipendenze necessarie per i test siano installate.
 
-##   License
-This project is licensed under the MIT License.
+## Sviluppi Futuri
+- Integrazione di API LLM aggiuntive per la correzione delle bozze
+- Monitoraggio delle prestazioni e logging avanzati
+- Supporto per formati di file aggiuntivi (es. PDF)
+- Funzionalità estese di controllo versione
+- Interfaccia multilingua
+
+## Risoluzione dei Problemi
+
+- **Variabili d'Ambiente**: Verifica che tutte le variabili d'ambiente richieste siano impostate correttamente in `.env.local` o nella configurazione del tuo provider di deployment.
+- **Migrazioni Database**: Verifica il tuo `DATABASE_URL` e assicurati che la tua istanza PostgreSQL sia in esecuzione se le migrazioni falliscono.
+- **Problemi di Deployment**: Controlla i log nel dashboard del tuo provider di hosting (es. Vercel) per eventuali messaggi di errore.
+- **Problemi di Installazione**: In caso di errori durante l'installazione delle dipendenze, prova a cancellare le cartelle `node_modules` e `.next`, quindi esegui nuovamente `npm install`.
+
+## Licenza
+Questo progetto è distribuito con licenza MIT.
+
+## Contributi
+I contributi sono benvenuti! Per favore, leggi le linee guida per i contributi nel file `CONTRIBUTING.md` prima di inviare una pull request.
+
+## Contatti
+Per domande o supporto, apri un issue nel repository o contatta il team di sviluppo all'indirizzo email: 
 
