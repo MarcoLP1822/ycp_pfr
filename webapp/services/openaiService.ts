@@ -1,66 +1,82 @@
-/**
- * @file services/openaiService.ts
- * @description
- * This module integrates with the OpenAI API to provide proofreading services.
- * It sends a given text to the OpenAI LLM (using the chat completions endpoint) 
- * for grammar, punctuation, and spelling correction, and returns a corrected 
- * version with inline highlights.
- *
- * Key features:
- * - Proofread text using OpenAI API.
- * - Implements error handling and retry logic.
- * - Uses the chat completions endpoint with a system prompt to guide corrections.
- *
- * @dependencies
- * - Relies on the global fetch API provided by Next.js or the browser.
- *
- * @notes
- * - Ensure the OPENAI_API_KEY environment variable is set.
- * - Adjust model parameters, temperature, or endpoint URL based on your needs.
- */
-
 export interface ProofreadingResult {
-    /**
-     * The corrected text returned by the OpenAI API.
-     */
-    correctedText: string;
-    /**
-     * Optional field for additional inline corrections metadata if provided.
-     */
-    inlineCorrections?: any;
-  }
-  
-  /**
-   * A helper function that returns a promise that resolves after a given delay.
-   * @param ms - The number of milliseconds to delay.
-   * @returns Promise that resolves after the delay.
-   */
-  function delay(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-  }
-  
-  /**
-   * Calls the OpenAI API to proofread the provided text.
-   * It uses a retry mechanism to handle transient errors.
-   *
-   * @param text - The text that needs to be proofread.
-   * @returns A promise that resolves to a ProofreadingResult containing the corrected text.
-   *
-   * @throws Error if all retry attempts fail.
-   */
-  export async function proofreadDocument(text: string): Promise<ProofreadingResult> {
-    // Define API endpoint and configuration
-    const API_URL = "https://api.openai.com/v1/chat/completions";
-    const API_KEY = process.env.OPENAI_API_KEY;
-    
-    if (!API_KEY) {
-      throw new Error("OPENAI_API_KEY is not set in the environment variables.");
+  correctedText: string;
+  inlineCorrections?: any;
+}
+
+/**
+ * Restituisce un array di chunk a partire dal testo in input.
+ * La funzione tenta di suddividere il testo per paragrafi e, se un paragrafo è troppo lungo,
+ * lo suddivide ulteriormente per frasi.
+ *
+ * @param text Il testo da suddividere.
+ * @param maxChunkLength Numero massimo di caratteri per ogni chunk.
+ * @returns Un array di stringhe, ognuna contenente un chunk del testo.
+ */
+function chunkText(text: string, maxChunkLength: number): string[] {
+  const paragraphs = text.split(/\n+/);
+  const chunks: string[] = [];
+  let currentChunk = "";
+
+  for (const para of paragraphs) {
+    // Se aggiungendo il paragrafo corrente il chunk non supera il limite, lo accumuliamo.
+    if (currentChunk.length + para.length + 1 <= maxChunkLength) {
+      currentChunk += (currentChunk ? "\n" : "") + para;
+    } else {
+      // Se il paragrafo è troppo lungo da solo, lo dividiamo ulteriormente per frasi.
+      if (para.length > maxChunkLength) {
+        if (currentChunk) {
+          chunks.push(currentChunk);
+          currentChunk = "";
+        }
+        const sentences = para.split(/(?<=[.?!])\s+/);
+        let sentenceChunk = "";
+        for (const sentence of sentences) {
+          if (sentenceChunk.length + sentence.length + 1 <= maxChunkLength) {
+            sentenceChunk += (sentenceChunk ? " " : "") + sentence;
+          } else {
+            if (sentenceChunk) {
+              chunks.push(sentenceChunk);
+            }
+            sentenceChunk = sentence;
+          }
+        }
+        if (sentenceChunk) {
+          chunks.push(sentenceChunk);
+        }
+      } else {
+        // Il paragrafo intero rientra da solo, quindi iniziamo un nuovo chunk.
+        if (currentChunk) {
+          chunks.push(currentChunk);
+        }
+        currentChunk = para;
+      }
     }
+  }
+  if (currentChunk) {
+    chunks.push(currentChunk);
+  }
+  return chunks;
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export async function proofreadDocument(text: string): Promise<ProofreadingResult> {
+  const API_URL = "https://api.openai.com/v1/chat/completions";
+  const API_KEY = process.env.OPENAI_API_KEY;
   
-    const MAX_RETRIES = 3;
-    const RETRY_DELAY_MS = 1000;
+  if (!API_KEY) {
+    throw new Error("OPENAI_API_KEY is not set in the environment variables.");
+  }
   
-    // Prepare the payload with system and user messages.
+  // Parametro per il chunking: ad esempio, 10.000 caratteri (questo valore può essere calibrato)
+  const MAX_CHUNK_LENGTH = 10000;
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY_MS = 1000;
+  
+  // Funzione che invia una richiesta di proofreading per un singolo chunk
+  async function proofreadChunk(chunk: string): Promise<string> {
     const payload = {
       model: "gpt-4o-mini",
       messages: [
@@ -70,11 +86,10 @@ export interface ProofreadingResult {
         },
         {
           role: "user",
-          content: `\n\n"${text}"`
+          content: `\n\n"${chunk}"`
         }
       ],
       temperature: 0.2,
-      // You may add additional parameters such as max_tokens if necessary.
     };
   
     let attempt = 0;
@@ -89,38 +104,47 @@ export interface ProofreadingResult {
           body: JSON.stringify(payload),
         });
   
-        // Check if the response is successful.
         if (!response.ok) {
           const errorResponse = await response.text();
           throw new Error(`OpenAI API error: ${response.status} - ${errorResponse}`);
         }
   
-        // Parse the response data.
         const data = await response.json();
-  
-        // Extract the corrected text from the first choice.
         const messageContent = data.choices && data.choices[0]?.message?.content;
         if (!messageContent) {
           throw new Error("No content returned from OpenAI API.");
         }
   
-        // Optionally, you can parse the response further if inline corrections metadata is provided.
-        const result: ProofreadingResult = {
-          correctedText: messageContent,
-        };
-  
-        return result;
+        return messageContent;
       } catch (error: any) {
         attempt++;
-        console.error(`Attempt ${attempt} failed: ${error.message}`);
+        console.error(`Attempt ${attempt} for chunk failed: ${error.message}`);
         if (attempt >= MAX_RETRIES) {
-          throw new Error(`Failed to proofread document after ${MAX_RETRIES} attempts: ${error.message}`);
+          throw new Error(`Failed to proofread chunk after ${MAX_RETRIES} attempts: ${error.message}`);
         }
-        // Wait before retrying.
         await delay(RETRY_DELAY_MS);
       }
     }
-    // This point should not be reached.
-    throw new Error("Unexpected error in proofreadDocument function.");
+    throw new Error("Unexpected error in proofreadChunk function.");
   }
   
+  // Se il testo è corto, processalo in un’unica chiamata
+  if (text.length <= MAX_CHUNK_LENGTH) {
+    const corrected = await proofreadChunk(text);
+    return { correctedText: corrected };
+  }
+  
+  // Altrimenti, suddividi il testo in chunk
+  const chunks = chunkText(text, MAX_CHUNK_LENGTH);
+  const correctedChunks: string[] = [];
+  
+  for (const chunk of chunks) {
+    const correctedChunk = await proofreadChunk(chunk);
+    correctedChunks.push(correctedChunk);
+  }
+  
+  // Unisci i risultati mantenendo le separazioni originali (ad esempio, una nuova linea tra i chunk)
+  const combinedCorrectedText = correctedChunks.join("\n");
+  
+  return { correctedText: combinedCorrectedText };
+}
