@@ -1,5 +1,3 @@
-/// <reference types="vite/client" />
-
 /**
  * @file services/openaiService.ts
  * @description
@@ -53,7 +51,7 @@ export interface ProofreadingResult {
   export async function proofreadDocument(text: string): Promise<ProofreadingResult> {
     // Define API endpoint and configuration
     const API_URL = "https://api.openai.com/v1/chat/completions";
-    const API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
+    const API_KEY = process.env.OPENAI_API_KEY;
     
     if (!API_KEY) {
       throw new Error("OPENAI_API_KEY is not set in the environment variables.");
