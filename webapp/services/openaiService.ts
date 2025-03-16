@@ -21,15 +21,14 @@ function chunkTextByTokens(text: string, maxTokens: number, model: string): stri
   // encoding.encode può ritornare un number[]; forziamolo a Uint32Array
   const tokensRaw = encoding.encode(text);
   const tokens = tokensRaw instanceof Uint32Array ? tokensRaw : new Uint32Array(tokensRaw);
-  const chunks: (string | Uint8Array)[] = [];
+  const chunks: string[] = [];
 
   for (let i = 0; i < tokens.length; i += maxTokens) {
     const tokenChunk = tokens.slice(i, i + maxTokens);
-    // tokenChunk è ora un Uint32Array, come richiesto
-    const chunkText = encoding.decode(tokenChunk);
-    chunks.push(chunkText);
+    const decoded = encoding.decode(tokenChunk);
+    chunks.push(decoded.toString());
   }
-  return chunks as string[];
+  return chunks;
 }
 
 function delay(ms: number): Promise<void> {
@@ -138,7 +137,7 @@ export async function proofreadDocument(
   const chunks = chunkTextByTokens(text, MAX_TOKENS_PER_CHUNK, model);
   Logger.info(`Testo diviso in ${chunks.length} chunk basati sui token.`);
 
-  // Processa i chunk in batch in parallelo
+  // Processa i chunk in batch in parallelo per velocizzare l'esecuzione
   const CONCURRENCY = 5;
   const correctedChunks: string[] = new Array(chunks.length).fill("");
 
