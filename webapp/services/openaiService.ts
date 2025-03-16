@@ -25,8 +25,8 @@ function chunkTextByTokens(text: string, maxTokens: number, model: string): stri
 
   for (let i = 0; i < tokens.length; i += maxTokens) {
     const tokenChunk = tokens.slice(i, i + maxTokens);
-    const chunkText = encoding.decode(tokenChunk);
-    chunks.push(chunkText);
+    const decoded = encoding.decode(tokenChunk);
+    chunks.push(decoded.toString());
   }
   return chunks;
 }
