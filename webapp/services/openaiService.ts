@@ -1,7 +1,7 @@
 // webapp/services/openaiService.ts
 
-import DiffMatchPatch from 'diff-match-patch';
 import Logger from './logger';
+import { encoding_for_model } from '@dqbd/tiktoken';
 
 export interface ProofreadingResult {
   correctedText: string;
@@ -9,68 +9,36 @@ export interface ProofreadingResult {
 }
 
 /**
- * Suddivide il testo in chunk, utilizzando prima i paragrafi e, se necessario, ulteriori suddivisioni per frasi.
+ * Utilizza tiktoken per suddividere il testo in chunk in base a un limite massimo di token.
  *
  * @param text Il testo da suddividere.
- * @param maxChunkLength Numero massimo di caratteri per ogni chunk.
+ * @param maxTokens Numero massimo di token per ogni chunk.
+ * @param model Il modello per cui eseguire l'encoding (es. "gpt-4o-mini").
  * @returns Un array di stringhe, ciascuna rappresentante un chunk.
  */
-function chunkText(text: string, maxChunkLength: number): string[] {
-  const paragraphs = text.split(/\n+/);
-  const chunks: string[] = [];
-  let currentChunk = "";
+function chunkTextByTokens(text: string, maxTokens: number, model: string): string[] {
+  const encoding = encoding_for_model(model as any);
+  // encoding.encode può ritornare un number[]; forziamolo a Uint32Array
+  const tokensRaw = encoding.encode(text);
+  const tokens = tokensRaw instanceof Uint32Array ? tokensRaw : new Uint32Array(tokensRaw);
+  const chunks: (string | Uint8Array)[] = [];
 
-  for (const para of paragraphs) {
-    if (currentChunk.length + para.length + 1 <= maxChunkLength) {
-      currentChunk += (currentChunk ? "\n" : "") + para;
-    } else {
-      // Se il paragrafo da solo supera il limite, lo suddividiamo ulteriormente per frasi.
-      if (para.length > maxChunkLength) {
-        if (currentChunk) {
-          chunks.push(currentChunk);
-          currentChunk = "";
-        }
-        const sentences = para.split(/(?<=[.?!])\s+/);
-        let sentenceChunk = "";
-        for (const sentence of sentences) {
-          if (sentenceChunk.length + sentence.length + 1 <= maxChunkLength) {
-            sentenceChunk += (sentenceChunk ? " " : "") + sentence;
-          } else {
-            if (sentenceChunk) {
-              chunks.push(sentenceChunk);
-            }
-            sentenceChunk = sentence;
-          }
-        }
-        if (sentenceChunk) {
-          chunks.push(sentenceChunk);
-        }
-      } else {
-        if (currentChunk) {
-          chunks.push(currentChunk);
-        }
-        currentChunk = para;
-      }
-    }
+  for (let i = 0; i < tokens.length; i += maxTokens) {
+    const tokenChunk = tokens.slice(i, i + maxTokens);
+    // tokenChunk è ora un Uint32Array, come richiesto
+    const chunkText = encoding.decode(tokenChunk);
+    chunks.push(chunkText);
   }
-  if (currentChunk) {
-    chunks.push(currentChunk);
-  }
-  return chunks;
+  return chunks as string[];
 }
 
-/**
- * Restituisce una Promise che si risolve dopo un determinato ritardo.
- *
- * @param ms Numero di millisecondi di attesa.
- */
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
  * Invia un singolo chunk all'API OpenAI per la correzione.
- * Vengono registrati log per ogni tentativo e per il successo di ciascun chunk.
+ * Vengono registrati log per ogni tentativo e per il successo del chunk.
  *
  * @param chunk Il testo del chunk da correggere.
  * @returns Il testo corretto restituito dall'LLM.
@@ -100,9 +68,7 @@ async function proofreadChunk(chunk: string): Promise<string> {
   let attempt = 0;
   while (attempt < MAX_RETRIES) {
     try {
-      Logger.info(
-        `Invio chunk (tentativo ${attempt + 1}): lunghezza ${chunk.length} caratteri.`
-      );
+      Logger.info(`Invio chunk (tentativo ${attempt + 1}): lunghezza ${chunk.length} caratteri.`);
       const response = await fetch(API_URL, {
         method: "POST",
         headers: {
@@ -114,9 +80,7 @@ async function proofreadChunk(chunk: string): Promise<string> {
 
       if (!response.ok) {
         const errorResponse = await response.text();
-        throw new Error(
-          `OpenAI API error: ${response.status} - ${errorResponse}`
-        );
+        throw new Error(`OpenAI API error: ${response.status} - ${errorResponse}`);
       }
 
       const data = await response.json();
@@ -129,13 +93,9 @@ async function proofreadChunk(chunk: string): Promise<string> {
       return messageContent;
     } catch (error: any) {
       attempt++;
-      Logger.error(
-        `Tentativo ${attempt} fallito per questo chunk: ${error.message}`
-      );
+      Logger.error(`Tentativo ${attempt} fallito per questo chunk: ${error.message}`);
       if (attempt >= MAX_RETRIES) {
-        throw new Error(
-          `Fallito il proofreading del chunk dopo ${MAX_RETRIES} tentativi: ${error.message}`
-        );
+        throw new Error(`Fallito il proofreading del chunk dopo ${MAX_RETRIES} tentativi: ${error.message}`);
       }
       await delay(RETRY_DELAY_MS);
     }
@@ -144,8 +104,9 @@ async function proofreadChunk(chunk: string): Promise<string> {
 }
 
 /**
- * Processa l'intero testo da correggere: se il testo supera un certo limite, viene suddiviso in chunk,
- * ogni chunk viene inviato all'API OpenAI e infine i risultati vengono concatenati.
+ * Processa l'intero testo da correggere. Se il testo supera un certo numero di token,
+ * viene suddiviso in chunk (usando tiktoken) e ciascun chunk viene inviato in batch all'API OpenAI
+ * per la correzione. I risultati vengono poi concatenati.
  *
  * @param text Il testo da correggere.
  * @returns Un oggetto ProofreadingResult contenente il testo corretto.
@@ -153,36 +114,47 @@ async function proofreadChunk(chunk: string): Promise<string> {
 export async function proofreadDocument(
   text: string
 ): Promise<ProofreadingResult> {
-  const MAX_CHUNK_LENGTH = 10000;
-  Logger.info(
-    `Inizio proofreading del documento: lunghezza totale ${text.length} caratteri.`
-  );
+  // Imposta il modello e il limite di token per ogni chunk
+  const model = "gpt-4o-mini";
+  const MAX_TOKENS_PER_CHUNK = 3000;
 
-  if (text.length <= MAX_CHUNK_LENGTH) {
-    Logger.info("Testo breve, procedo con una singola chiamata.");
+  Logger.info(`Inizio proofreading del documento: lunghezza totale ${text.length} caratteri.`);
+
+  // Ottieni l'encoding e il numero totale di token
+  const encoding = encoding_for_model(model as any);
+  const tokensRaw = encoding.encode(text);
+  const tokens = tokensRaw instanceof Uint32Array ? tokensRaw : new Uint32Array(tokensRaw);
+  const totalTokens = tokens.length;
+  Logger.info(`Il documento contiene circa ${totalTokens} token.`);
+
+  if (totalTokens <= MAX_TOKENS_PER_CHUNK) {
+    Logger.info("Testo breve in termini di token, procedo con una singola chiamata.");
     const corrected = await proofreadChunk(text);
     Logger.info("Proofreading completato per il testo completo.");
     return { correctedText: corrected };
   }
 
-  // Suddivide il testo in chunk
-  const chunks = chunkText(text, MAX_CHUNK_LENGTH);
-  Logger.info(`Testo diviso in ${chunks.length} chunk.`);
+  // Suddivide il testo in chunk in base al numero di token
+  const chunks = chunkTextByTokens(text, MAX_TOKENS_PER_CHUNK, model);
+  Logger.info(`Testo diviso in ${chunks.length} chunk basati sui token.`);
 
-  const correctedChunks: string[] = [];
-  // Processa ogni chunk e logga il progresso
-  for (let i = 0; i < chunks.length; i++) {
-    Logger.info(
-      `Elaborazione chunk ${i + 1} di ${chunks.length} (lunghezza ${chunks[i].length}).`
-    );
-    const correctedChunk = await proofreadChunk(chunks[i]);
-    correctedChunks.push(correctedChunk);
-    Logger.info(`Chunk ${i + 1} elaborato con successo.`);
+  // Processa i chunk in batch in parallelo
+  const CONCURRENCY = 5;
+  const correctedChunks: string[] = new Array(chunks.length).fill("");
+
+  for (let i = 0; i < chunks.length; i += CONCURRENCY) {
+    const batch = chunks.slice(i, i + CONCURRENCY).map((chunk, idxInBatch) => {
+      const absoluteIndex = i + idxInBatch;
+      return proofreadChunk(chunk).then((corrected) => {
+        correctedChunks[absoluteIndex] = corrected;
+        Logger.info(`Chunk ${absoluteIndex + 1} elaborato con successo.`);
+      });
+    });
+    await Promise.all(batch);
+    Logger.info(`Batch di chunk da ${i + 1} a ${i + batch.length} completato.`);
   }
 
   const combinedCorrectedText = correctedChunks.join("\n");
-  Logger.info(
-    "Proofreading completato per tutti i chunk. Testo corretto combinato."
-  );
+  Logger.info("Proofreading completato per tutti i chunk. Testo corretto combinato.");
   return { correctedText: combinedCorrectedText };
 }
