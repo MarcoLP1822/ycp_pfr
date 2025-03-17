@@ -1,20 +1,11 @@
-/**
- * @file pages/dashboard.tsx
- * @description
- * Dashboard page that integrates file upload, file listing, version control,
- * and now a button to “View Current Version” without re-proofreading.
- *
- * Key changes:
- * - Added `handleViewCurrentVersion` that just routes to `/proofreading/[fileId]`.
- * - Passed it to <FileList> as onViewCurrent
- */
-
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import {
   Container,
   Typography,
   Box,
+  LinearProgress,
+  Alert
 } from '@mui/material';
 import FileUpload from '../components/FileUpload';
 import FileList, { FileData } from '../components/FileList';
@@ -25,6 +16,11 @@ const Dashboard: React.FC = () => {
   const [showVersionModal, setShowVersionModal] = useState(false);
   const [versionModalFileId, setVersionModalFileId] = useState<string | null>(null);
   const [versions, setVersions] = useState<Version[]>([]);
+  // Stato per gestire il file in proofreading e l'AbortController
+  const [proofreadingFileId, setProofreadingFileId] = useState<string | null>(null);
+  const [abortController, setAbortController] = useState<AbortController | null>(null);
+  // Stato per mostrare eventuali errori durante il processo
+  const [proofreadingError, setProofreadingError] = useState<string>('');
   const router = useRouter();
 
   const fetchFiles = async () => {
@@ -45,7 +41,7 @@ const Dashboard: React.FC = () => {
     fetchFiles();
   }, []);
 
-  // Called after a new file is uploaded
+  // Quando viene caricato un nuovo file, lo aggiungiamo alla lista
   const handleFileUploaded = (newFile: FileData) => {
     setFiles((prev) => [newFile, ...prev]);
   };
@@ -88,26 +84,46 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  // Re-runs the AI proofreading process
+  // Gestione del processo di proofreading con invio sequenziale
   const handleProofread = async (fileId: string) => {
+    setProofreadingError('');
+    // Se il file è già in proofreading, annulla la richiesta
+    if (proofreadingFileId === fileId && abortController) {
+      abortController.abort();
+      setProofreadingFileId(null);
+      setAbortController(null);
+      return;
+    }
+    // Altrimenti, avvia il processo e salva il controller
+    const controller = new AbortController();
+    setProofreadingFileId(fileId);
+    setAbortController(controller);
     try {
       const response = await fetch('/api/proofreading/process', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ file_id: fileId }),
+        signal: controller.signal,
       });
       if (!response.ok) {
-        console.error('Proofreading process failed:', response.statusText);
-        return;
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Proofreading process failed.');
       }
-      // Once done, route to the newly updated version
+      // Una volta completato il processo, reindirizza alla pagina di proofreading
       router.push(`/proofreading/${fileId}`);
-    } catch (error) {
-      console.error('Error triggering proofreading process:', error);
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        console.log('Proofreading process was cancelled.');
+      } else {
+        console.error('Error triggering proofreading process:', error);
+        setProofreadingError(error.message);
+      }
+    } finally {
+      setProofreadingFileId(null);
+      setAbortController(null);
     }
   };
 
-  // Opens the existing proofread version without re-proofreading
   const handleViewCurrentVersion = (fileId: string) => {
     router.push(`/proofreading/${fileId}`);
   };
@@ -186,8 +202,20 @@ const Dashboard: React.FC = () => {
         Dashboard
       </Typography>
 
-      {/* Pass handleFileUploaded so newly uploaded files appear without refresh */}
       <FileUpload onFileUploaded={handleFileUploaded} />
+
+      {/* Se un file è in proofreading, mostriamo un indicatore di progresso */}
+      {proofreadingFileId && (
+        <Box sx={{ my: 2 }}>
+          <Alert severity="info">Elaborazione in corso per il file {proofreadingFileId}... attendere.</Alert>
+          <LinearProgress />
+        </Box>
+      )}
+      {proofreadingError && (
+        <Box sx={{ my: 2 }}>
+          <Alert severity="error">{proofreadingError}</Alert>
+        </Box>
+      )}
 
       <Box mt={4}>
         <Typography variant="h5" gutterBottom>
@@ -200,6 +228,7 @@ const Dashboard: React.FC = () => {
           onProofread={handleProofread}
           onViewCurrent={handleViewCurrentVersion}
           onViewVersions={handleViewVersions}
+          proofreadingFileId={proofreadingFileId}
         />
       </Box>
 

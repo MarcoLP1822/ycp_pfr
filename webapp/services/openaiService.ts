@@ -103,13 +103,13 @@ async function proofreadChunk(chunk: string): Promise<string> {
 
 /**
  * Processa l'intero testo da correggere. Se il testo supera un certo numero di token,
- * viene suddiviso in chunk e ciascun chunk viene inviato in batch all'API OpenAI per la correzione.
+ * viene suddiviso in chunk e ciascun chunk viene inviato uno alla volta all'API OpenAI per la correzione.
  * I risultati vengono poi concatenati.
  *
  * Log dettagliati registrano:
  * - Tempo totale di esecuzione
  * - Numero di token e chunk
- * - Inizio e fine di ciascun batch, con logging dell'uso della memoria corrente
+ * - Inizio e fine di ciascun chunk, con logging dell'uso della memoria corrente
  *
  * @param text Il testo da correggere.
  * @returns Un oggetto ProofreadingResult contenente il testo corretto.
@@ -139,23 +139,20 @@ export async function proofreadDocument(
   const chunks = chunkTextByTokens(text, MAX_TOKENS_PER_CHUNK, model);
   Logger.info(`Testo diviso in ${chunks.length} chunk basati sui token.`);
 
-  // Ridotto il livello di concorrenza per diminuire il consumo di memoria
-  const CONCURRENCY = 2;
-  const correctedChunks: string[] = new Array(chunks.length).fill("");
-
-  for (let i = 0; i < chunks.length; i += CONCURRENCY) {
-    const batchStart = Date.now();
-    Logger.info(`Inizio elaborazione batch di chunk da ${i + 1} a ${i + Math.min(CONCURRENCY, chunks.length - i)}`);
-    const batch = chunks.slice(i, i + CONCURRENCY).map((chunk, idxInBatch) => {
-      const absoluteIndex = i + idxInBatch;
-      return proofreadChunk(chunk).then((corrected) => {
-        correctedChunks[absoluteIndex] = corrected;
-        Logger.info(`Chunk ${absoluteIndex + 1} elaborato con successo.`);
-      });
-    });
-    await Promise.all(batch);
-    Logger.info(`Batch di chunk da ${i + 1} a ${i + Math.min(CONCURRENCY, chunks.length - i)} completato in ${Date.now() - batchStart}ms.`);
-    Logger.info(`Memoria corrente: ${JSON.stringify(process.memoryUsage())}`);
+  // Elaborazione sequenziale: inviamo un chunk alla volta
+  const correctedChunks: string[] = [];
+  for (let i = 0; i < chunks.length; i++) {
+    const chunkStart = Date.now();
+    Logger.info(`Invio chunk ${i + 1}/${chunks.length}: lunghezza ${chunks[i].length} caratteri.`);
+    try {
+      const corrected = await proofreadChunk(chunks[i]);
+      correctedChunks.push(corrected);
+      Logger.info(`Chunk ${i + 1} elaborato con successo in ${Date.now() - chunkStart}ms.`);
+      Logger.info(`Memoria corrente: ${JSON.stringify(process.memoryUsage())}`);
+    } catch (err: any) {
+      Logger.error(`Errore nell'elaborazione del chunk ${i + 1}: ${err.message}`);
+      throw err;
+    }
   }
 
   const combinedCorrectedText = correctedChunks.join("\n");
