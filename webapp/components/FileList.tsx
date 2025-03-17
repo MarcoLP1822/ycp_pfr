@@ -1,14 +1,3 @@
-/**
- * @file components/FileList.tsx
- * @description
- * Displays a list of uploaded files using Material UI. Each file is rendered
- * by FileItem. We now pass `onViewCurrent` so the user can view the existing version.
- *
- * @dependencies
- * - React
- * - FileItem
- */
-
 import React from 'react';
 import FileItem from './FileItem';
 
@@ -22,13 +11,14 @@ export interface FileData {
   file_url: string;
 }
 
-interface FileListProps {
+export interface FileListProps {
   files: FileData[];
   onRename: (fileId: string, newName: string) => void;
   onDelete: (fileId: string) => void;
   onProofread: (fileId: string) => void;
   onViewVersions: (fileId: string) => void;
-  onViewCurrent: (fileId: string) => void; // NEW callback
+  onViewCurrent: (fileId: string) => void;
+  proofreadingFileId?: string | null;
 }
 
 const FileList: React.FC<FileListProps> = ({
@@ -38,6 +28,7 @@ const FileList: React.FC<FileListProps> = ({
   onProofread,
   onViewVersions,
   onViewCurrent,
+  proofreadingFileId = null,
 }) => {
   if (files.length === 0) {
     return <p>No files uploaded yet.</p>;
@@ -54,6 +45,7 @@ const FileList: React.FC<FileListProps> = ({
           onProofread={onProofread}
           onViewVersions={onViewVersions}
           onViewCurrent={onViewCurrent}
+          isProofreading={file.file_id === proofreadingFileId}
         />
       ))}
     </div>
