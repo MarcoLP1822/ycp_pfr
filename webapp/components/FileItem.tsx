@@ -1,21 +1,3 @@
-/**
- * @file components/FileItem.tsx
- * @description
- * Represents an individual file item in the list using Material UI.
- * We now have a new button “View Current” that calls onViewCurrent.
- *
- * Key features:
- * - Inline rename with a TextField
- * - Delete confirmation dialog
- * - Proofread triggers re-proofreading
- * - Version History opens the modal
- * - NEW: “View Current” to open the existing version at /proofreading/[fileId]
- *
- * @dependencies
- * - React
- * - Material UI
- */
-
 import React, { useState } from 'react';
 import {
   Card,
@@ -32,13 +14,14 @@ import {
 } from '@mui/material';
 import { FileData } from './FileList';
 
-interface FileItemProps {
+export interface FileItemProps {
   file: FileData;
   onRename: (fileId: string, newName: string) => void;
   onDelete: (fileId: string) => void;
   onProofread: (fileId: string) => void;
   onViewVersions: (fileId: string) => void;
-  onViewCurrent: (fileId: string) => void; // NEW
+  onViewCurrent: (fileId: string) => void;
+  isProofreading?: boolean;
 }
 
 const FileItem: React.FC<FileItemProps> = ({
@@ -48,14 +31,12 @@ const FileItem: React.FC<FileItemProps> = ({
   onProofread,
   onViewVersions,
   onViewCurrent,
+  isProofreading = false,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [newName, setNewName] = useState(file.file_name);
-
-  // State to control the delete confirmation dialog
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
-  // Called to finalize the rename
   const handleRename = () => {
     if (newName.trim() && newName !== file.file_name) {
       onRename(file.file_id, newName);
@@ -63,18 +44,15 @@ const FileItem: React.FC<FileItemProps> = ({
     setIsEditing(false);
   };
 
-  // Called when the user clicks the "Delete" button
   const handleDeleteClick = () => {
     setConfirmDeleteOpen(true);
   };
 
-  // Called when the user confirms deletion in the dialog
   const handleConfirmDelete = () => {
     onDelete(file.file_id);
     setConfirmDeleteOpen(false);
   };
 
-  // Called when the user cancels deletion in the dialog
   const handleCancelDelete = () => {
     setConfirmDeleteOpen(false);
   };
@@ -132,7 +110,7 @@ const FileItem: React.FC<FileItemProps> = ({
             color="error"
             onClick={() => onProofread(file.file_id)}
           >
-            Avvia correzione
+            {isProofreading ? 'ANNULLA' : 'Avvia correzione'}
           </Button>
           <Button
             size="small"
@@ -152,7 +130,6 @@ const FileItem: React.FC<FileItemProps> = ({
         </CardActions>
       </Card>
 
-      {/* Delete Confirmation Dialog */}
       <Dialog
         open={confirmDeleteOpen}
         onClose={handleCancelDelete}
@@ -164,8 +141,7 @@ const FileItem: React.FC<FileItemProps> = ({
         </DialogTitle>
         <DialogContent>
           <DialogContentText id="confirm-delete-dialog-description">
-            Are you sure you want to delete <strong>{file.file_name}</strong>?
-            This action cannot be undone.
+            Are you sure you want to delete <strong>{file.file_name}</strong>? This action cannot be undone.
           </DialogContentText>
         </DialogContent>
         <DialogActions>
