@@ -22,8 +22,9 @@
   "include": [
     "next-env.d.ts",
     "**/*.ts",
-    "**/*.tsx"
-, "tsconfig.jest.json"  ],
+    "**/*.tsx",
+    "tiktoken.d.ts",
+    "tsconfig.jest.json"  ],
   "exclude": [
     "node_modules"
   ]
