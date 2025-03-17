@@ -18,9 +18,7 @@ export interface ProofreadingResult {
  */
 function chunkTextByTokens(text: string, maxTokens: number, model: string): string[] {
   const encoding = encoding_for_model(model as any);
-  // encoding.encode può ritornare un number[]; forziamolo a Uint32Array
-  const tokensRaw = encoding.encode(text);
-  const tokens = tokensRaw instanceof Uint32Array ? tokensRaw : new Uint32Array(tokensRaw);
+  const tokens = encoding.encode(text);
   const chunks: string[] = [];
 
   for (let i = 0; i < tokens.length; i += maxTokens) {
