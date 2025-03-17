@@ -11,8 +11,7 @@
  *  7. Increments version_number by 1 and updates the file's current_text with the plain corrected text.
  *  8. Sets proofreading_status to 'complete'.
  *
- * Key change:
- * - We now do `version_number: fileRecord.version_number + 1` to track the new version each time you proofread.
+ * A new listener for 'aborted' is added to log if the client cancels the request.
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -28,11 +27,16 @@ import Logger from '../../../services/logger';
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   Logger.info(`Proofreading process endpoint invoked with method ${req.method}.`);
 
-  // Only POST is allowed
   if (req.method !== 'POST') {
     Logger.warn('Method not allowed on proofreading process endpoint.');
     return res.status(405).json({ error: 'Method not allowed. Only POST requests are accepted.' });
   }
+
+  // Listen for client aborting the request
+  req.on('aborted', () => {
+    Logger.info("Client aborted the request; cancelling proofreading process.");
+    // Optionally, add qui eventuale cleanup per operazioni lunghe.
+  });
 
   const { file_id } = req.body;
   if (!file_id) {
@@ -65,7 +69,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (downloadError || !downloadData) {
       Logger.error(`Failed to download file: ${downloadError?.message}`);
-      // revert status
+      // Revert status to pending if download fails
       await drizzleClient
         .update(files)
         .set({ proofreading_status: 'pending' })
@@ -121,8 +125,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
     Logger.info(`Proofreading log inserted for file_id: ${file_id}`);
 
-    // 8. Update the file's current_text with the plain corrected text
-    //    and increment version_number by 1
+    // 8. Update the file's current_text with the plain corrected text and increment version_number
     await drizzleClient
       .update(files)
       .set({
