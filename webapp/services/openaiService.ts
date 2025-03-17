@@ -75,7 +75,7 @@ async function proofreadChunk(chunk: string): Promise<string> {
       });
       const duration = Date.now() - startTime;
       Logger.info(`Richiesta completata in ${duration}ms per chunk di lunghezza ${chunk.length}.`);
-
+      
       if (!response.ok) {
         const errorResponse = await response.text();
         throw new Error(`OpenAI API error: ${response.status} - ${errorResponse}`);
@@ -109,7 +109,7 @@ async function proofreadChunk(chunk: string): Promise<string> {
  * Log dettagliati registrano:
  * - Tempo totale di esecuzione
  * - Numero di token e chunk
- * - Inizio e fine di ciascun batch
+ * - Inizio e fine di ciascun batch, con logging dell'uso della memoria corrente
  *
  * @param text Il testo da correggere.
  * @returns Un oggetto ProofreadingResult contenente il testo corretto.
@@ -119,11 +119,10 @@ export async function proofreadDocument(
 ): Promise<ProofreadingResult> {
   const model = "gpt-4o-mini";
   const MAX_TOKENS_PER_CHUNK = 3000;
-
+  
   Logger.info(`Inizio proofreading del documento: lunghezza totale ${text.length} caratteri.`);
   const startTimeTotal = Date.now();
 
-  // Calcola il numero totale di token
   const encoding = encoding_for_model(model as any);
   const tokensRaw = encoding.encode(text);
   const tokens = tokensRaw instanceof Uint32Array ? tokensRaw : new Uint32Array(tokensRaw);
@@ -133,16 +132,15 @@ export async function proofreadDocument(
   if (totalTokens <= MAX_TOKENS_PER_CHUNK) {
     Logger.info("Testo breve in termini di token, procedo con una singola chiamata.");
     const corrected = await proofreadChunk(text);
-    Logger.info("Proofreading completato per il testo completo.");
-    Logger.info(`Tempo totale proofreading: ${Date.now() - startTimeTotal}ms`);
+    Logger.info(`Proofreading completato per il testo completo in ${Date.now() - startTimeTotal}ms`);
     return { correctedText: corrected };
   }
 
-  // Suddivide il testo in chunk
   const chunks = chunkTextByTokens(text, MAX_TOKENS_PER_CHUNK, model);
   Logger.info(`Testo diviso in ${chunks.length} chunk basati sui token.`);
 
-  const CONCURRENCY = 5;
+  // Ridotto il livello di concorrenza per diminuire il consumo di memoria
+  const CONCURRENCY = 2;
   const correctedChunks: string[] = new Array(chunks.length).fill("");
 
   for (let i = 0; i < chunks.length; i += CONCURRENCY) {
@@ -157,10 +155,10 @@ export async function proofreadDocument(
     });
     await Promise.all(batch);
     Logger.info(`Batch di chunk da ${i + 1} a ${i + Math.min(CONCURRENCY, chunks.length - i)} completato in ${Date.now() - batchStart}ms.`);
+    Logger.info(`Memoria corrente: ${JSON.stringify(process.memoryUsage())}`);
   }
 
   const combinedCorrectedText = correctedChunks.join("\n");
-  Logger.info("Proofreading completato per tutti i chunk. Testo corretto combinato.");
-  Logger.info(`Tempo totale proofreading: ${Date.now() - startTimeTotal}ms`);
+  Logger.info(`Proofreading completato per tutti i chunk. Tempo totale: ${Date.now() - startTimeTotal}ms`);
   return { correctedText: combinedCorrectedText };
 }
