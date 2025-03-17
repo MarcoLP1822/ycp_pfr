@@ -13,6 +13,7 @@
         "test": "jest"
     },
     "dependencies": {
+        "@dqbd/tiktoken": "^1.0.20",
         "@emotion/react": "^11.14.0",
         "@emotion/styled": "^11.14.0",
         "@mui/material": "^6.4.6",
@@ -27,7 +28,9 @@
         "docxtemplater": "^3.60.1",
         "dotenv": "^16.4.7",
         "drizzle-orm": "^0.40.0",
+        "esbuild": "^0.25.1",
         "formidable": "^3.5.2",
+        "glob": "^11.0.1",
         "jsonwebtoken": "^9.0.2",
         "mammoth": "^1.9.0",
         "next": "latest",
