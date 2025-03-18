@@ -12,6 +12,10 @@
  * - createPagesServerClient for Supabase Storage interaction
  * - extractTextFromFile from services/textExtractor
  * - InferModel from drizzle-orm for type casting the insert payload
+ *
+ * @notes
+ * - Ensure that the /api/files/upload endpoint returns the newly inserted file object
+ *   so we can pass it to the parent.
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -51,14 +55,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     // Create the insert payload including new columns.
+    // Instead of null, we use empty strings to satisfy the NOT NULL constraint.
     const newFileValues: FileInsert = {
       user_id,
       file_name,
       file_type,
       file_url,
       proofreading_status: 'pending',
-      original_text: null,
-      current_text: null,
+      original_text: "",
+      current_text: "",
     };
 
     // Insert file metadata into the 'files' table.
