@@ -10,7 +10,8 @@
         "format": "prettier --write .",
         "db:generate": "drizzle-kit generate",
         "db:migrate": "drizzle-kit migrate",
-        "test": "jest"
+        "test": "jest",
+        "worker": "ts-node worker.ts"
     },
     "dependencies": {
         "@dqbd/tiktoken": "^1.0.20",
