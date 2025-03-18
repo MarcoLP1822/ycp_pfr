@@ -1,28 +1,31 @@
 /**
  * @file pages/proofreading/[fileId].tsx
  * @description
- * Questa pagina dinamica permette all'utente di visualizzare e interagire con l'interfaccia di proofreading per un file specifico.
- * Mostra il testo originale e quello corretto (con le revisioni evidenziate) e permette di scaricare il file DOCX corretto.
+ * Questa pagina dinamica permette all'utente di visualizzare e interagire con l'interfaccia
+ * di proofreading per un file specifico. Mostra il testo originale e quello corretto (con le revisioni evidenziate)
+ * e permette di scaricare il file DOCX corretto.
  *
- * Modifica:
- * - Il pulsante "Download DOCX" ora invia una richiesta POST all'endpoint "/api/proofreading/merge-docx" 
- *   che a sua volta chiama il microservizio .NET per generare il file DOCX con la formattazione originale e le revisioni.
+ * Modifiche apportate:
+ * - Aggiunta del componente JobStatus per il monitoraggio in tempo reale dello stato del job.
  *
  * @dependencies
  * - React per la gestione dello stato e del rendering.
  * - Next.js Router per la gestione delle rotte dinamiche.
  * - Material UI per i componenti UI.
  * - CorrectionControls per l'accettazione delle correzioni.
+ * - JobStatus per il monitoraggio dello stato dei job.
  *
  * @notes
  * - La funzione stripHtml rimuove eventuali tag HTML dal testo corretto prima di inviarlo al microservizio.
  * - La gestione del download utilizza un blob per forzare il salvataggio del file DOCX.
  */
+
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { Container, Typography, Box, Button, Alert } from '@mui/material';
 import { highlightDifferences } from '../../services/diffHighlighter';
+import JobStatus from '../../components/JobStatus';
 
 export interface ProofreadingData {
   originalText: string;
@@ -169,6 +172,8 @@ const ProofreadingInterfacePage: React.FC = () => {
         <Typography>File ID: {fileId}</Typography>
         {data?.versionNumber && <Typography>Current Version: {data.versionNumber}</Typography>}
       </Box>
+      {/* New JobStatus component to monitor the live status of the job */}
+      {fileId && typeof fileId === 'string' && <JobStatus fileId={fileId} />}
       <Link
         href="/dashboard"
         style={{
