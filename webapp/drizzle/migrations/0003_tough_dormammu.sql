@@ -1,0 +1,1 @@
+ALTER TABLE "files" ADD COLUMN "cancellation_requested" boolean DEFAULT false NOT NULL;
