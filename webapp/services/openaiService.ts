@@ -6,14 +6,6 @@ export interface ProofreadingResult {
   inlineCorrections?: any;
 }
 
-/**
- * Suddivide il testo in chunk basati su un limite massimo di token.
- *
- * @param text Il testo da suddividere.
- * @param maxTokens Numero massimo di token per ogni chunk.
- * @param model Il modello per l'encoding (es. "gpt-4o-mini").
- * @returns Un array di stringhe, ciascuna rappresentante un chunk.
- */
 function chunkTextByTokens(text: string, maxTokens: number, model: string): string[] {
   const encoding = encoding_for_model(model as any);
   const tokens = encoding.encode(text);
@@ -31,13 +23,6 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/**
- * Invia un singolo chunk all'API OpenAI per la correzione.
- * Registra log dettagliati per ciascun tentativo e il tempo impiegato.
- *
- * @param chunk Il testo del chunk da correggere.
- * @returns Il testo corretto restituito dall'LLM.
- */
 async function proofreadChunk(chunk: string): Promise<string> {
   const API_URL = "https://api.openai.com/v1/chat/completions";
   const API_KEY = process.env.OPENAI_API_KEY;
@@ -80,13 +65,13 @@ async function proofreadChunk(chunk: string): Promise<string> {
         const errorResponse = await response.text();
         throw new Error(`OpenAI API error: ${response.status} - ${errorResponse}`);
       }
-
+      
       const data = await response.json();
       const messageContent = data.choices && data.choices[0]?.message?.content;
       if (!messageContent) {
         throw new Error("Nessun contenuto restituito dall'API OpenAI.");
       }
-
+      
       Logger.info(`Chunk corretto con successo (tentativo ${attempt + 1}).`);
       return messageContent;
     } catch (error: any) {
@@ -102,46 +87,42 @@ async function proofreadChunk(chunk: string): Promise<string> {
 }
 
 /**
- * Processa l'intero testo da correggere. Se il testo supera un certo numero di token,
- * viene suddiviso in chunk e ciascun chunk viene inviato uno alla volta all'API OpenAI per la correzione.
- * I risultati vengono poi concatenati.
- *
- * Log dettagliati registrano:
- * - Tempo totale di esecuzione
- * - Numero di token e chunk
- * - Inizio e fine di ciascun chunk, con logging dell'uso della memoria corrente
- *
+ * Processa l'intero testo da correggere inviando i chunk uno alla volta.
  * @param text Il testo da correggere.
- * @returns Un oggetto ProofreadingResult contenente il testo corretto.
+ * @param isCancelled Funzione che ritorna true se il processo è stato cancellato.
+ * @returns Il testo corretto.
  */
 export async function proofreadDocument(
-  text: string
+  text: string,
+  isCancelled?: () => boolean
 ): Promise<ProofreadingResult> {
   const model = "gpt-4o-mini";
   const MAX_TOKENS_PER_CHUNK = 3000;
   
   Logger.info(`Inizio proofreading del documento: lunghezza totale ${text.length} caratteri.`);
   const startTimeTotal = Date.now();
-
   const encoding = encoding_for_model(model as any);
   const tokensRaw = encoding.encode(text);
   const tokens = tokensRaw instanceof Uint32Array ? tokensRaw : new Uint32Array(tokensRaw);
   const totalTokens = tokens.length;
   Logger.info(`Il documento contiene circa ${totalTokens} token.`);
-
+  
   if (totalTokens <= MAX_TOKENS_PER_CHUNK) {
-    Logger.info("Testo breve in termini di token, procedo con una singola chiamata.");
+    Logger.info("Testo breve, procedo con una singola chiamata.");
     const corrected = await proofreadChunk(text);
-    Logger.info(`Proofreading completato per il testo completo in ${Date.now() - startTimeTotal}ms`);
+    Logger.info(`Proofreading completato in ${Date.now() - startTimeTotal}ms.`);
     return { correctedText: corrected };
   }
-
+  
   const chunks = chunkTextByTokens(text, MAX_TOKENS_PER_CHUNK, model);
   Logger.info(`Testo diviso in ${chunks.length} chunk basati sui token.`);
-
-  // Elaborazione sequenziale: inviamo un chunk alla volta
+  
   const correctedChunks: string[] = [];
   for (let i = 0; i < chunks.length; i++) {
+    if (isCancelled && isCancelled()) {
+      Logger.info(`Processo cancellato prima del chunk ${i + 1}.`);
+      throw new Error("Processo di proofreading cancellato dall'utente.");
+    }
     const chunkStart = Date.now();
     Logger.info(`Invio chunk ${i + 1}/${chunks.length}: lunghezza ${chunks[i].length} caratteri.`);
     try {
@@ -154,8 +135,8 @@ export async function proofreadDocument(
       throw err;
     }
   }
-
+  
   const combinedCorrectedText = correctedChunks.join("\n");
-  Logger.info(`Proofreading completato per tutti i chunk. Tempo totale: ${Date.now() - startTimeTotal}ms`);
+  Logger.info(`Proofreading completato in ${Date.now() - startTimeTotal}ms.`);
   return { correctedText: combinedCorrectedText };
 }

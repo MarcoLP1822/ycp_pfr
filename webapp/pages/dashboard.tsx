@@ -5,7 +5,7 @@ import {
   Typography,
   Box,
   LinearProgress,
-  Alert
+  Alert,
 } from '@mui/material';
 import FileUpload from '../components/FileUpload';
 import FileList, { FileData } from '../components/FileList';
@@ -19,7 +19,7 @@ const Dashboard: React.FC = () => {
   // Stato per gestire il file in proofreading e l'AbortController
   const [proofreadingFileId, setProofreadingFileId] = useState<string | null>(null);
   const [abortController, setAbortController] = useState<AbortController | null>(null);
-  // Stato per mostrare eventuali errori durante il processo
+  // Stato per mostrare eventuali errori di proofreading
   const [proofreadingError, setProofreadingError] = useState<string>('');
   const router = useRouter();
 
@@ -41,7 +41,6 @@ const Dashboard: React.FC = () => {
     fetchFiles();
   }, []);
 
-  // Quando viene caricato un nuovo file, lo aggiungiamo alla lista
   const handleFileUploaded = (newFile: FileData) => {
     setFiles((prev) => [newFile, ...prev]);
   };
@@ -84,17 +83,17 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  // Gestione del processo di proofreading con invio sequenziale
+  // Gestione del processo di proofreading: se il file è già in elaborazione, il clic annulla il processo
   const handleProofread = async (fileId: string) => {
     setProofreadingError('');
-    // Se il file è già in proofreading, annulla la richiesta
     if (proofreadingFileId === fileId && abortController) {
+      // Annulla il processo in corso
       abortController.abort();
       setProofreadingFileId(null);
       setAbortController(null);
       return;
     }
-    // Altrimenti, avvia il processo e salva il controller
+    // Avvia il processo e crea un nuovo AbortController
     const controller = new AbortController();
     setProofreadingFileId(fileId);
     setAbortController(controller);
@@ -109,7 +108,7 @@ const Dashboard: React.FC = () => {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Proofreading process failed.');
       }
-      // Una volta completato il processo, reindirizza alla pagina di proofreading
+      // Al completamento, reindirizza alla pagina di proofreading
       router.push(`/proofreading/${fileId}`);
     } catch (error: any) {
       if (error.name === 'AbortError') {
@@ -204,10 +203,12 @@ const Dashboard: React.FC = () => {
 
       <FileUpload onFileUploaded={handleFileUploaded} />
 
-      {/* Se un file è in proofreading, mostriamo un indicatore di progresso */}
+      {/* Stato visivo per il processo di proofreading */}
       {proofreadingFileId && (
         <Box sx={{ my: 2 }}>
-          <Alert severity="info">Elaborazione in corso per il file {proofreadingFileId}... attendere.</Alert>
+          <Alert severity="info">
+            Elaborazione in corso per il file {proofreadingFileId}… attendere.
+          </Alert>
           <LinearProgress />
         </Box>
       )}
