@@ -27,11 +27,11 @@
  */
 
 import { eq, sql } from 'drizzle-orm';
-import drizzleClient from './webapp/services/drizzleClient';
-import { files, proofreadingLogs } from './webapp/db/schema';
-import Logger from './webapp/services/logger';
-import { proofreadDocument } from './webapp/services/openaiService';
-import { extractTextFromFile, SupportedFileType } from './webapp/services/textExtractor';
+import drizzleClient from './services/drizzleClient';
+import { files, proofreadingLogs } from './db/schema';
+import Logger from './services/logger';
+import { proofreadDocument } from './services/openaiService';
+import { extractTextFromFile, SupportedFileType } from './services/textExtractor';
 import { createClient } from '@supabase/supabase-js';
 
 /**
