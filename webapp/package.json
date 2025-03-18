@@ -11,8 +11,8 @@
         "db:generate": "drizzle-kit generate",
         "db:migrate": "drizzle-kit migrate",
         "test": "jest",
-        "build-worker": "tsc worker.ts --outDir dist",
-        "worker": "NODE_OPTIONS='--max-old-space-size=1024' node dist/worker.js"
+        "build-worker": "tsc -p tsconfig.worker.json",
+        "worker": "concurrently \"NODE_OPTIONS='--max-old-space-size=1024' node dist/worker.js\" \"node dummyServer.js\""
     },
     "dependencies": {
         "@dqbd/tiktoken": "^1.0.20",
@@ -63,6 +63,7 @@
         "@typescript-eslint/parser": "latest",
         "autoprefixer": "^10.4.20",
         "babel-jest": "^29.7.0",
+        "concurrently": "^7.6.0",
         "drizzle-kit": "^0.30.5",
         "eslint": "latest",
         "eslint-config-next": "latest",
