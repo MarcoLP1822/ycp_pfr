@@ -1,81 +1,16 @@
-/**
- * @description
- * Global CSS file that imports Tailwind CSS base, components, and utilities.
- * This file applies foundational typography and spacing styles to the entire application,
- * ensuring a modern, sleek, and minimalist aesthetic that aligns with the mocha color palette.
- *
- * Key features:
- * - Imports a modern sans-serif font ("Inter") from Google Fonts.
- * - Defines base styles for the body, headings, paragraphs, links, buttons, and container.
- * - Sets a clean and consistent layout with ample white space.
- *
- * @notes
- * - Ensure this file is imported in _app.tsx so that the styles are applied globally.
- * - Adjust any values as needed to fine-tune the aesthetics.
- */
+/* Esempio minimal di reset e tipografia base */
 
-/* Importing the Inter font from Google Fonts for modern, clean typography */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
 
-/* Import Tailwind CSS base, components, and utilities */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-/* Global typography and spacing styles */
+html,
 body {
-  font-family: 'Inter', sans-serif;
-  background-color: #f7f7f7; /* Light background for a clean look */
-  color: #333333;
-  line-height: 1.6;
   margin: 0;
   padding: 0;
+  box-sizing: border-box;
+  font-family: 'Inter', sans-serif;
+  background-color: #f5f5f5;
 }
 
-h1, h2, h3, h4, h5, h6 {
-  font-weight: 600;
-  margin: 0 0 0.5rem 0;
-  line-height: 1.2;
-}
-
-p {
-  margin: 0 0 1rem 0;
-}
-
-/* Anchor tags should inherit color and have no default underline */
-a {
-  color: inherit;
-  text-decoration: none;
-}
-
-/* Button styles: smooth transitions and pointer cursor */
-button {
-  transition: background-color 0.2s ease, color 0.2s ease;
-  cursor: pointer;
-}
-
-/* Container class for consistent layout width and padding */
-.container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 1rem;
-}
-
-/* Additional global spacing utilities for a minimalist design */
-.section {
-  padding: 2rem 1rem;
-}
-
-.article {
-  margin-bottom: 2rem;
-}
-
-/* Override some default styles for lists if needed */
-ul, ol {
-  margin: 0 0 1rem 1.5rem;
-  padding: 0;
-}
-
-li {
-  margin-bottom: 0.5rem;
+*, *::before, *::after {
+  box-sizing: inherit;
 }

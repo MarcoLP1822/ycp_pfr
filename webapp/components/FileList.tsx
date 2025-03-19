@@ -1,5 +1,6 @@
 import React from 'react';
 import FileItem from './FileItem';
+import { Grid, Typography } from '@mui/material';
 
 export interface FileData {
   file_id: string;
@@ -31,24 +32,25 @@ const FileList: React.FC<FileListProps> = ({
   proofreadingFileId = null,
 }) => {
   if (files.length === 0) {
-    return <p>No files uploaded yet.</p>;
+    return <Typography>No files uploaded yet.</Typography>;
   }
 
   return (
-    <div>
+    <Grid container spacing={2}>
       {files.map((file) => (
-        <FileItem
-          key={file.file_id}
-          file={file}
-          onRename={onRename}
-          onDelete={onDelete}
-          onProofread={onProofread}
-          onViewVersions={onViewVersions}
-          onViewCurrent={onViewCurrent}
-          isProofreading={file.file_id === proofreadingFileId}
-        />
+        <Grid item xs={12} sm={6} md={4} key={file.file_id}>
+          <FileItem
+            file={file}
+            onRename={onRename}
+            onDelete={onDelete}
+            onProofread={onProofread}
+            onViewVersions={onViewVersions}
+            onViewCurrent={onViewCurrent}
+            isProofreading={file.file_id === proofreadingFileId}
+          />
+        </Grid>
       ))}
-    </div>
+    </Grid>
   );
 };
 

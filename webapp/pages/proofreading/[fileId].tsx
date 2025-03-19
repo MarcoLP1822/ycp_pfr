@@ -1,31 +1,9 @@
-/**
- * @file pages/proofreading/[fileId].tsx
- * @description
- * Questa pagina dinamica permette all'utente di visualizzare e interagire con l'interfaccia
- * di proofreading per un file specifico. Mostra il testo originale e quello corretto (con le revisioni evidenziate)
- * e permette di scaricare il file DOCX corretto.
- *
- * Modifiche apportate:
- * - Aggiunta del componente JobStatus per il monitoraggio in tempo reale dello stato del job.
- *
- * @dependencies
- * - React per la gestione dello stato e del rendering.
- * - Next.js Router per la gestione delle rotte dinamiche.
- * - Material UI per i componenti UI.
- * - CorrectionControls per l'accettazione delle correzioni.
- * - JobStatus per il monitoraggio dello stato dei job.
- *
- * @notes
- * - La funzione stripHtml rimuove eventuali tag HTML dal testo corretto prima di inviarlo al microservizio.
- * - La gestione del download utilizza un blob per forzare il salvataggio del file DOCX.
- */
-
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { Container, Typography, Box, Button, Alert } from '@mui/material';
-import { highlightDifferences } from '../../services/diffHighlighter';
 import JobStatus from '../../components/JobStatus';
+import { highlightDifferences } from '../../services/diffHighlighter';
 
 export interface ProofreadingData {
   originalText: string;
@@ -33,7 +11,6 @@ export interface ProofreadingData {
   versionNumber?: number;
 }
 
-// Helper function to strip HTML tags from a string.
 const stripHtml = (html: string): string => {
   const div = document.createElement('div');
   div.innerHTML = html;
@@ -47,11 +24,8 @@ const ProofreadingInterfacePage: React.FC = () => {
   const [data, setData] = useState<ProofreadingData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>('');
-  // editMode: false means read-only, true means editing plain text.
   const [editMode, setEditMode] = useState<boolean>(false);
-  // editedText holds the plain text version for editing.
   const [editedText, setEditedText] = useState<string>('');
-  // State per la gestione del download
   const [downloadLoading, setDownloadLoading] = useState<boolean>(false);
   const [downloadError, setDownloadError] = useState<string>('');
 
@@ -84,7 +58,6 @@ const ProofreadingInterfacePage: React.FC = () => {
     setEditMode((prev) => !prev);
   };
 
-  // Handler per scaricare il file DOCX tramite il microservizio.
   const handleDownload = async () => {
     if (!fileId || typeof fileId !== 'string' || !data) return;
     setDownloadLoading(true);
@@ -94,7 +67,7 @@ const ProofreadingInterfacePage: React.FC = () => {
       const response = await fetch('/api/proofreading/merge-docx', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ file_id: fileId, correctedText: plainCorrectedText })
+        body: JSON.stringify({ file_id: fileId, correctedText: plainCorrectedText }),
       });
       if (!response.ok) {
         const errorData = await response.json();
@@ -124,7 +97,6 @@ const ProofreadingInterfacePage: React.FC = () => {
     }
   };
 
-  // Handler per avviare il processo di proofreading (ri-esegue il processo AI).
   const handleProofread = async (fileId: string) => {
     try {
       const response = await fetch('/api/proofreading/process', {
@@ -142,14 +114,9 @@ const ProofreadingInterfacePage: React.FC = () => {
     }
   };
 
-  // Handler per visualizzare la cronologia delle versioni.
-  const handleViewVersions = async (fileId: string) => {
-    // Implementazione esistente...
-  };
-
   if (loading) {
     return (
-      <Container style={{ minHeight: '100vh', padding: '2rem' }}>
+      <Container sx={{ minHeight: '100vh', py: 4 }}>
         <Typography>Loading proofreading data...</Typography>
       </Container>
     );
@@ -157,127 +124,106 @@ const ProofreadingInterfacePage: React.FC = () => {
 
   if (error) {
     return (
-      <Container style={{ minHeight: '100vh', padding: '2rem' }}>
-        <Typography style={{ color: 'red' }}>{error}</Typography>
+      <Container sx={{ minHeight: '100vh', py: 4 }}>
+        <Typography color="error">{error}</Typography>
       </Container>
     );
   }
 
   return (
-    <Container style={{ minHeight: '100vh', padding: '2rem' }}>
-      <Typography variant="h4" style={{ marginBottom: '1rem' }}>
+    <Container sx={{ minHeight: '100vh', py: 4 }}>
+      <Typography variant="h4" sx={{ mb: 2 }}>
         Proofreading Interface
       </Typography>
-      <Box style={{ marginBottom: '1rem' }}>
+      <Box sx={{ mb: 2 }}>
         <Typography>File ID: {fileId}</Typography>
-        {data?.versionNumber && <Typography>Current Version: {data.versionNumber}</Typography>}
+        {data?.versionNumber && (
+          <Typography>Current Version: {data.versionNumber}</Typography>
+        )}
       </Box>
-      {/* New JobStatus component to monitor the live status of the job */}
+
       {fileId && typeof fileId === 'string' && <JobStatus fileId={fileId} />}
-      <Link
-        href="/dashboard"
-        style={{
-          marginBottom: '2rem',
-          display: 'inline-block',
-          textDecoration: 'underline',
-          color: '#333',
-        }}
-      >
-        Back to Dashboard
+
+      <Link href="/dashboard" passHref>
+        <Button variant="text" sx={{ mb: 2 }}>
+          Back to Dashboard
+        </Button>
       </Link>
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: '1rem',
-          marginTop: '1rem',
-        }}
-      >
+
+      {/* Se stai in editMode, textarea, altrimenti dangerouslySetInnerHTML */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
         {/* Original Text Panel */}
-        <div style={{ border: '1px solid #ccc', padding: '1rem' }}>
+        <Box sx={{ border: '1px solid #ccc', p: 2 }}>
           <Typography variant="h6">Original Text</Typography>
-          <textarea
+          <Box
+            component="textarea"
             readOnly
-            style={{ width: '100%', height: '400px', marginTop: '0.5rem' }}
             value={data?.originalText || ''}
+            sx={{
+              width: '100%',
+              height: 400,
+              mt: 1,
+              resize: 'none',
+              p: 1,
+              borderColor: '#ccc',
+            }}
           />
-        </div>
+        </Box>
         {/* Corrected Text Panel */}
-        <div style={{ border: '1px solid #ccc', padding: '1rem' }}>
+        <Box sx={{ border: '1px solid #ccc', p: 2 }}>
           <Typography variant="h6">Corrected Text</Typography>
           {editMode ? (
-            <textarea
-              style={{
+            <Box
+              component="textarea"
+              sx={{
                 width: '100%',
-                height: '400px',
-                marginTop: '0.5rem',
-                overflow: 'auto',
-                whiteSpace: 'pre-wrap',
+                height: 400,
+                mt: 1,
+                resize: 'none',
+                p: 1,
               }}
               value={editedText}
               onChange={(e) => setEditedText(e.target.value)}
             />
           ) : (
-            <div
-              style={{
+            <Box
+              sx={{
                 width: '100%',
-                height: '400px',
-                marginTop: '0.5rem',
-                overflow: 'auto',
-                whiteSpace: 'pre-wrap',
+                height: 400,
+                mt: 1,
+                overflowY: 'auto',
+                p: 1,
               }}
               dangerouslySetInnerHTML={{ __html: data?.correctedText || '' }}
             />
           )}
-          <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', flexWrap: 'wrap' }}>
-            <Button
-              onClick={toggleEditMode}
-              style={{
-                padding: '0.5rem 1rem',
-                backgroundColor: '#1976d2',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-              }}
-            >
+          <Box sx={{ display: 'flex', gap: 1, mt: 2, flexWrap: 'wrap' }}>
+            <Button variant="contained" onClick={toggleEditMode}>
               {editMode ? 'Save Changes' : 'Modifica'}
             </Button>
             <Button
-              onClick={handleProofread.bind(null, fileId as string)}
-              style={{
-                padding: '0.5rem 1rem',
-                backgroundColor: '#388e3c',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-              }}
+              variant="contained"
+              color="success"
+              onClick={() => handleProofread(fileId as string)}
             >
               Re-proofread
             </Button>
             <Button
+              variant="contained"
+              color="primary"
               onClick={handleDownload}
-              style={{
-                padding: '0.5rem 1rem',
-                backgroundColor: downloadLoading ? '#ccc' : '#5e35b1',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: downloadLoading ? 'not-allowed' : 'pointer',
-              }}
               disabled={downloadLoading}
             >
               {downloadLoading ? 'Downloading...' : 'Download DOCX'}
             </Button>
-          </div>
+          </Box>
           {downloadError && (
             <Box mt={2}>
               <Alert severity="error">{downloadError}</Alert>
             </Box>
           )}
-        </div>
-      </div>
+        </Box>
+      </Box>
     </Container>
   );
 };

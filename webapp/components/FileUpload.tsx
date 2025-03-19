@@ -1,19 +1,3 @@
-/**
- * @file components/FileUpload.tsx
- * @description
- * Handles uploading files. After a successful upload, it calls `onFileUploaded(newFile)`,
- * letting the parent know about the new file so it can be displayed immediately.
- *
- * @dependencies
- * - React
- * - Material UI
- * - @supabase/auth-helpers-react
- *
- * @notes
- * - Ensure the /api/files/upload endpoint returns the newly inserted file object
- *   so we can pass it to the parent.
- */
-
 import React, { useState, ChangeEvent } from 'react';
 import { useSupabaseClient, useSession } from '@supabase/auth-helpers-react';
 import {
@@ -25,7 +9,6 @@ import {
   Alert,
 } from '@mui/material';
 
-// This interface must match your FileData structure from FileList
 interface FileData {
   file_id: string;
   file_name: string;
@@ -86,14 +69,14 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUploaded }) => {
       const fileName = `${Date.now()}-${selectedFile.name}`;
       const bucketName = 'uploads';
 
-      // 1) Upload the file to Supabase storage
+      // 1) Upload del file su Supabase
       const { data, error: uploadError } = await supabase.storage
         .from(bucketName)
         .upload(fileName, selectedFile);
 
       if (uploadError) {
         console.error('Upload error:', uploadError);
-        setErrorMessage(`Upload to bucket failed: ${uploadError.message}`);
+        setErrorMessage(`Upload failed: ${uploadError.message}`);
         setUploading(false);
         return;
       }
@@ -103,7 +86,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUploaded }) => {
       ).toLowerCase();
       const fileUrl = data?.path || fileName;
 
-      // 2) Insert a row in the `files` table
+      // 2) Insert row in DB
       const bodyData = {
         user_id: session.user.id,
         file_name: selectedFile.name,
@@ -127,12 +110,10 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUploaded }) => {
         return;
       }
 
-      // 3) Parse the newly inserted file object from the response
       const newFile: FileData = await response.json();
-      setUploadSuccess('File uploaded and database updated successfully.');
+      setUploadSuccess('File uploaded successfully.');
       setSelectedFile(null);
 
-      // 4) Notify the parent so the new file can appear immediately in the list
       if (onFileUploaded) {
         onFileUploaded(newFile);
       }
@@ -163,21 +144,18 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUploaded }) => {
         )}
 
         <Box display="flex" alignItems="center" gap={2}>
-          {/* Hidden file input with aria-label */}
           <input
             type="file"
             accept=".doc,.docx,.odt,.odf,.txt"
             onChange={handleFileChange}
             style={{ display: 'none' }}
             id="file-input"
-            aria-label="File Upload Input"
           />
           <label htmlFor="file-input">
             <Button variant="contained" component="span">
               Choose File
             </Button>
           </label>
-
           <Typography variant="body2">
             {selectedFile ? selectedFile.name : 'No file selected'}
           </Typography>

@@ -1,42 +1,33 @@
-/**
- * @description 
- * This file exports a custom Material UI theme to provide Material Design styles across the application.
- * It defines color palettes, typography, and any other theme-level customizations.
- * 
- * Key features:
- * - Custom primary and secondary colors for branding
- * - Default Material Design theming for typography and components
- * 
- * @dependencies
- * - @mui/material/styles: Used to create and manage the MUI theme
- * 
- * @notes
- * - You can customize the color palette, typography, and component overrides here
- * - This file is imported in _app.tsx to wrap the entire app in the Material UI ThemeProvider
- */
-
 import { createTheme } from '@mui/material/styles';
 
-// You can customize these colors and other theme options as desired
 const theme = createTheme({
   palette: {
     primary: {
-      main: '#926441', // Material UI default primary
+      main: '#1976d2', // Blu MUI di base
     },
     secondary: {
-      main: '#e3b7a0', // Material UI default secondary
+      main: '#9c27b0', // Magenta
     },
     background: {
-      default: '#ffeddb', // Light grey background
+      default: '#f5f5f5', // Sfondo chiaro
+      paper: '#ffffff',
+    },
+    text: {
+      primary: '#333333',
     },
   },
   typography: {
-    fontFamily: [
-      'Roboto',
-      '"Helvetica Neue"',
-      'Arial',
-      'sans-serif'
-    ].join(','),
+    fontFamily: ['Inter', 'sans-serif'].join(','),
+  },
+  components: {
+    MuiButton: {
+      styleOverrides: {
+        root: {
+          borderRadius: 6,
+          textTransform: 'none',
+        },
+      },
+    },
   },
 });
 

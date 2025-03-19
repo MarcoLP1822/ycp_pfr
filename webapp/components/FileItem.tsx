@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import {
-  Card,
-  CardContent,
-  CardActions,
+  Paper,
+  Box,
   Button,
   Typography,
   TextField,
@@ -10,8 +9,11 @@ import {
   DialogTitle,
   DialogContent,
   DialogContentText,
-  DialogActions,
+  DialogActions as DialogActionsMui,
+  IconButton,
 } from '@mui/material';
+import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
 import { FileData } from './FileList';
 
 export interface FileItemProps {
@@ -59,8 +61,10 @@ const FileItem: React.FC<FileItemProps> = ({
 
   return (
     <>
-      <Card variant="outlined" sx={{ mb: 2 }}>
-        <CardContent>
+      {/* Paper invece di Card */}
+      <Paper elevation={3} sx={{ mb: 2, p: 2 }}>
+        {/* Sezione contenuto */}
+        <Box sx={{ mb: 2 }}>
           {isEditing ? (
             <TextField
               value={newName}
@@ -87,49 +91,53 @@ const FileItem: React.FC<FileItemProps> = ({
           <Typography variant="body2" color="text.secondary">
             Status: {file.proofreading_status}
           </Typography>
-        </CardContent>
-        <CardActions>
-          <Button
-            size="small"
-            variant="outlined"
-            color="error"
-            onClick={handleDeleteClick}
-          >
-            Elimina
-          </Button>
-          <Button
-            size="small"
-            variant="outlined"
-            onClick={() => setIsEditing(true)}
-          >
-            Rinomina
-          </Button>
+        </Box>
+
+        {/* Sezione azioni */}
+        <Box
+          sx={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 1,
+          }}
+        >
+          <IconButton color="error" onClick={handleDeleteClick}>
+            <DeleteIcon />
+          </IconButton>
+
+          <IconButton onClick={() => setIsEditing(true)}>
+            <EditIcon />
+          </IconButton>
+
           <Button
             size="small"
             variant="contained"
             color="error"
             onClick={() => onProofread(file.file_id)}
           >
-            {isProofreading ? 'ANNULLA' : 'Avvia correzione'}
+            {isProofreading ? 'ANNULLA' : 'AVVIA CORREZIONE'}
           </Button>
+
           <Button
             size="small"
             variant="contained"
             color="info"
             onClick={() => onViewCurrent(file.file_id)}
           >
-            Vedi Versione Corrente
+            VERSIONE CORRENTE
           </Button>
+
           <Button
             size="small"
             variant="outlined"
             onClick={() => onViewVersions(file.file_id)}
           >
-            Version History
+            VERSION HISTORY
           </Button>
-        </CardActions>
-      </Card>
+        </Box>
+      </Paper>
 
+      {/* Dialog di conferma eliminazione */}
       <Dialog
         open={confirmDeleteOpen}
         onClose={handleCancelDelete}
@@ -141,15 +149,21 @@ const FileItem: React.FC<FileItemProps> = ({
         </DialogTitle>
         <DialogContent>
           <DialogContentText id="confirm-delete-dialog-description">
-            Are you sure you want to delete <strong>{file.file_name}</strong>? This action cannot be undone.
+            Are you sure you want to delete <strong>{file.file_name}</strong>?
+            This action cannot be undone.
           </DialogContentText>
         </DialogContent>
-        <DialogActions>
+        <DialogActionsMui>
           <Button onClick={handleCancelDelete}>Cancel</Button>
-          <Button onClick={handleConfirmDelete} autoFocus color="error" variant="contained">
+          <Button
+            onClick={handleConfirmDelete}
+            autoFocus
+            color="error"
+            variant="contained"
+          >
             Delete
           </Button>
-        </DialogActions>
+        </DialogActionsMui>
       </Dialog>
     </>
   );

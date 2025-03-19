@@ -6,6 +6,8 @@ import {
   Box,
   LinearProgress,
   Alert,
+  Card,
+  CardContent,
 } from '@mui/material';
 import FileUpload from '../components/FileUpload';
 import FileList, { FileData } from '../components/FileList';
@@ -16,10 +18,8 @@ const Dashboard: React.FC = () => {
   const [showVersionModal, setShowVersionModal] = useState(false);
   const [versionModalFileId, setVersionModalFileId] = useState<string | null>(null);
   const [versions, setVersions] = useState<Version[]>([]);
-  // Stato per gestire il file in proofreading e l'AbortController
   const [proofreadingFileId, setProofreadingFileId] = useState<string | null>(null);
   const [abortController, setAbortController] = useState<AbortController | null>(null);
-  // Stato per mostrare eventuali errori di proofreading
   const [proofreadingError, setProofreadingError] = useState<string>('');
   const router = useRouter();
 
@@ -83,17 +83,14 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  // Gestione del processo di proofreading: se il file è già in elaborazione, il clic annulla il processo
   const handleProofread = async (fileId: string) => {
     setProofreadingError('');
     if (proofreadingFileId === fileId && abortController) {
-      // Annulla il processo in corso
       abortController.abort();
       setProofreadingFileId(null);
       setAbortController(null);
       return;
     }
-    // Avvia il processo e crea un nuovo AbortController
     const controller = new AbortController();
     setProofreadingFileId(fileId);
     setAbortController(controller);
@@ -108,7 +105,6 @@ const Dashboard: React.FC = () => {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Proofreading process failed.');
       }
-      // Al completamento, reindirizza alla pagina di proofreading
       router.push(`/proofreading/${fileId}`);
     } catch (error: any) {
       if (error.name === 'AbortError') {
@@ -203,7 +199,6 @@ const Dashboard: React.FC = () => {
 
       <FileUpload onFileUploaded={handleFileUploaded} />
 
-      {/* Stato visivo per il processo di proofreading */}
       {proofreadingFileId && (
         <Box sx={{ my: 2 }}>
           <Alert severity="info">
@@ -218,7 +213,8 @@ const Dashboard: React.FC = () => {
         </Box>
       )}
 
-      <Box mt={4}>
+      <Card variant="outlined" sx={{ mt: 4 }}>
+      <CardContent>
         <Typography variant="h5" gutterBottom>
           Your Files
         </Typography>
@@ -227,11 +223,12 @@ const Dashboard: React.FC = () => {
           onRename={handleRename}
           onDelete={handleDelete}
           onProofread={handleProofread}
-          onViewCurrent={handleViewCurrentVersion}
           onViewVersions={handleViewVersions}
+          onViewCurrent={handleViewCurrentVersion}
           proofreadingFileId={proofreadingFileId}
         />
-      </Box>
+      </CardContent>
+    </Card>
 
       <VersionControlModal
         isOpen={showVersionModal}
