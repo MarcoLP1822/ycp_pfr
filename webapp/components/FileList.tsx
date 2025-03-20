@@ -38,7 +38,7 @@ const FileList: React.FC<FileListProps> = ({
   return (
     <Grid container spacing={2}>
       {files.map((file) => (
-        <Grid item xs={12} sm={6} md={4} key={file.file_id}>
+        <Grid item xs={12} key={file.file_id}>
           <FileItem
             file={file}
             onRename={onRename}

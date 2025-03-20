@@ -1,7 +1,7 @@
 {
   "version": 3,
   "targets": {
-    "net9.0": {
+    "net8.0": {
       "Codeuctivity.OpenXmlPowerTools/8.0.314": {
         "type": "package",
         "dependencies": {
@@ -20,13 +20,13 @@
           }
         }
       },
-      "DiffMatchPatch/4.0.0": {
+      "DiffMatchPatch/3.0.0": {
         "type": "package",
         "compile": {
-          "lib/net9.0/DiffMatchPatch.dll": {}
+          "lib/net8.0/DiffMatchPatch.dll": {}
         },
         "runtime": {
-          "lib/net9.0/DiffMatchPatch.dll": {}
+          "lib/net8.0/DiffMatchPatch.dll": {}
         }
       },
       "DocumentFormat.OpenXml/3.2.0": {
@@ -145,12 +145,12 @@
           "Microsoft.OpenApi": "1.6.22"
         },
         "compile": {
-          "lib/net9.0/Swashbuckle.AspNetCore.Swagger.dll": {
+          "lib/net8.0/Swashbuckle.AspNetCore.Swagger.dll": {
             "related": ".pdb;.xml"
           }
         },
         "runtime": {
-          "lib/net9.0/Swashbuckle.AspNetCore.Swagger.dll": {
+          "lib/net8.0/Swashbuckle.AspNetCore.Swagger.dll": {
             "related": ".pdb;.xml"
           }
         },
@@ -164,12 +164,12 @@
           "Swashbuckle.AspNetCore.Swagger": "7.3.1"
         },
         "compile": {
-          "lib/net9.0/Swashbuckle.AspNetCore.SwaggerGen.dll": {
+          "lib/net8.0/Swashbuckle.AspNetCore.SwaggerGen.dll": {
             "related": ".pdb;.xml"
           }
         },
         "runtime": {
-          "lib/net9.0/Swashbuckle.AspNetCore.SwaggerGen.dll": {
+          "lib/net8.0/Swashbuckle.AspNetCore.SwaggerGen.dll": {
             "related": ".pdb;.xml"
           }
         }
@@ -177,12 +177,12 @@
       "Swashbuckle.AspNetCore.SwaggerUI/7.3.1": {
         "type": "package",
         "compile": {
-          "lib/net9.0/Swashbuckle.AspNetCore.SwaggerUI.dll": {
+          "lib/net8.0/Swashbuckle.AspNetCore.SwaggerUI.dll": {
             "related": ".pdb;.xml"
           }
         },
         "runtime": {
-          "lib/net9.0/Swashbuckle.AspNetCore.SwaggerUI.dll": {
+          "lib/net8.0/Swashbuckle.AspNetCore.SwaggerUI.dll": {
             "related": ".pdb;.xml"
           }
         },
@@ -259,16 +259,16 @@
         "nugetReadme.md"
       ]
     },
-    "DiffMatchPatch/4.0.0": {
-      "sha512": "NS4Rzdj3TLT+bx6BgbIKbFBAs7vIr1KEtygFDmffwFZ/7wURKwgvqcFX6/P07R+OaQRiM204HzmMhJ3Sh1Axzg==",
+    "DiffMatchPatch/3.0.0": {
+      "sha512": "rczdkrMX0u55mUjP4tsbvc8yIfdPIOPRA+ttukp1Ir1xdBUmTK6HgdnXTyiyYSGqrjt0rq/aK1GWGO+SsqrTuA==",
       "type": "package",
-      "path": "diffmatchpatch/4.0.0",
+      "path": "diffmatchpatch/3.0.0",
       "files": [
         ".nupkg.metadata",
         ".signature.p7s",
-        "diffmatchpatch.4.0.0.nupkg.sha512",
+        "diffmatchpatch.3.0.0.nupkg.sha512",
         "diffmatchpatch.nuspec",
-        "lib/net9.0/DiffMatchPatch.dll"
+        "lib/net8.0/DiffMatchPatch.dll"
       ]
     },
     "DocumentFormat.OpenXml/3.2.0": {
@@ -813,9 +813,9 @@
     }
   },
   "projectFileDependencyGroups": {
-    "net9.0": [
+    "net8.0": [
       "Codeuctivity.OpenXmlPowerTools >= 8.0.314",
-      "DiffMatchPatch >= 4.0.0",
+      "DiffMatchPatch >= 3.0.0",
       "DocumentFormat.OpenXml >= 3.2.0",
       "Swashbuckle.AspNetCore >= 7.3.1"
     ]
@@ -836,14 +836,14 @@
         "C:\\Users\\Youcanprint1\\AppData\\Roaming\\NuGet\\NuGet.Config"
       ],
       "originalTargetFrameworks": [
-        "net9.0"
+        "net8.0"
       ],
       "sources": {
         "https://api.nuget.org/v3/index.json": {}
       },
       "frameworks": {
-        "net9.0": {
-          "targetAlias": "net9.0",
+        "net8.0": {
+          "targetAlias": "net8.0",
           "projectReferences": {}
         }
       },
@@ -860,8 +860,8 @@
       "SdkAnalysisLevel": "9.0.200"
     },
     "frameworks": {
-      "net9.0": {
-        "targetAlias": "net9.0",
+      "net8.0": {
+        "targetAlias": "net8.0",
         "dependencies": {
           "Codeuctivity.OpenXmlPowerTools": {
             "target": "Package",
@@ -869,7 +869,7 @@
           },
           "DiffMatchPatch": {
             "target": "Package",
-            "version": "[4.0.0, )"
+            "version": "[3.0.0, )"
           },
           "DocumentFormat.OpenXml": {
             "target": "Package",
@@ -891,6 +891,24 @@
         ],
         "assetTargetFallback": true,
         "warn": true,
+        "downloadDependencies": [
+          {
+            "name": "Microsoft.AspNetCore.App.Ref",
+            "version": "[8.0.14, 8.0.14]"
+          },
+          {
+            "name": "Microsoft.NETCore.App.Host.win-x64",
+            "version": "[8.0.14, 8.0.14]"
+          },
+          {
+            "name": "Microsoft.NETCore.App.Ref",
+            "version": "[8.0.14, 8.0.14]"
+          },
+          {
+            "name": "Microsoft.WindowsDesktop.App.Ref",
+            "version": "[8.0.14, 8.0.14]"
+          }
+        ],
         "frameworkReferences": {
           "Microsoft.AspNetCore.App": {
             "privateAssets": "none"

@@ -24,7 +24,7 @@
     "**/*.ts",
     "**/*.tsx",
     "tiktoken.d.ts",
-    "tsconfig.jest.json"  ],
+    "tsconfig.jest.json", "webapp/dummyServer.js"  ],
   "exclude": [
     "node_modules"
   ]
