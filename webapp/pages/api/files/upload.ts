@@ -5,17 +5,25 @@
  * file metadata (user_id, file_name, file_type, file_url). It uploads the file to Supabase Storage,
  * extracts text from the file, and stores that text in the new columns 'original_text' and 'current_text'.
  *
+ * This updated version includes una validazione lato server basata sul contenuto del file utilizzando la libreria "file-type".
+ *
+ * NOTA: Assicurati di aver installato il modulo "file-type" eseguendo:
+ *       npm install file-type
+ * oppure
+ *       yarn add file-type
+ * Se TypeScript non trova il modulo, aggiungi anche un file "file-type.d.ts" nella root con:
+ *       declare module 'file-type';
+ *
  * @dependencies
  * - Next.js API types
- * - Drizzle ORM for database operations
- * - Logger service for logging
- * - createPagesServerClient for Supabase Storage interaction
- * - extractTextFromFile from services/textExtractor
- * - InferModel from drizzle-orm for type casting the insert payload
+ * - Drizzle ORM per le operazioni sul database
+ * - Logger per il logging
+ * - createPagesServerClient per l'interazione con Supabase Storage
+ * - extractTextFromFile per l'estrazione del testo
+ * - file-type: per determinare il MIME type effettivo dal buffer del file
  *
  * @notes
- * - Ensure that the /api/files/upload endpoint returns the newly inserted file object
- *   so we can pass it to the parent.
+ * - Assicurarsi di aver installato file-type: `npm install file-type`
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -26,12 +34,20 @@ import { eq } from 'drizzle-orm';
 import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
 import { extractTextFromFile, SupportedFileType } from '../../../services/textExtractor';
 import { InferModel } from 'drizzle-orm';
+// Importa la funzione fileTypeFromBuffer (non ha default export)
+import { fileTypeFromBuffer } from 'file-type';
 
-// Allowed file extensions for validation
-const allowedExtensions = ['doc', 'docx', 'odt', 'odf', 'txt'];
-
-// Define the type for inserting into the files table
 type FileInsert = InferModel<typeof files, 'insert'>;
+
+const allowedExtensions = ['doc', 'docx', 'odt', 'odf', 'txt'];
+// Mappa tra estensione e MIME type atteso
+const allowedMimeTypes: { [key: string]: string } = {
+  doc: 'application/msword',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  txt: 'text/plain',
+  odt: 'application/vnd.oasis.opendocument.text',
+  odf: 'application/vnd.oasis.opendocument.text'
+};
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   Logger.info(`File upload endpoint invoked with method ${req.method}.`);
@@ -54,8 +70,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    // Create the insert payload including new columns.
-    // Instead of null, we use empty strings to satisfy the NOT NULL constraint.
+    // Inserisci la nuova riga nella tabella "files"
     const newFileValues: FileInsert = {
       user_id,
       file_name,
@@ -66,11 +81,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       current_text: "",
     };
 
-    // Insert file metadata into the 'files' table.
     const [newFile] = await drizzleClient.insert(files).values(newFileValues).returning();
     Logger.info(`File metadata inserted: ${JSON.stringify(newFile)}`);
 
-    // Download the file from Supabase Storage for text extraction.
+    // Crea il client Supabase e scarica il file dallo storage
     const supabase = createPagesServerClient({ req, res });
     const { data: downloadData, error: downloadError } = await supabase.storage
       .from('uploads')
@@ -81,14 +95,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(500).json({ error: 'Failed to download file for text extraction.' });
     }
 
-    // Convert the Blob to a Buffer.
+    // Converti il Blob in un Buffer
     const arrayBuffer = await downloadData.arrayBuffer();
     const fileBuffer = Buffer.from(new Uint8Array(arrayBuffer));
 
-    // Extract text from the file.
+    // Validazione lato server: rileva il MIME type effettivo dal buffer
+    const detected = await fileTypeFromBuffer(fileBuffer);
+    const expectedMime = allowedMimeTypes[fileExtension];
+    if (!detected || detected.mime !== expectedMime) {
+      Logger.error(
+        `File content MIME type mismatch. Expected: ${expectedMime}, Detected: ${detected ? detected.mime : 'unknown'}`
+      );
+      return res.status(400).json({ error: 'Il contenuto del file non corrisponde al tipo atteso.' });
+    }
+
+    // Estrai il testo dal file
     const extractedText = await extractTextFromFile(fileBuffer, fileExtension as SupportedFileType);
 
-    // Update the inserted file row with the extracted text.
+    // Aggiorna la riga inserita con il testo estratto
     const [updatedFile] = await drizzleClient
       .update(files)
       .set({
