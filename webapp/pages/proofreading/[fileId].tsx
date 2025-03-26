@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Container, Typography, Box, Button, Alert } from '@mui/material';
 import JobStatus from '../../components/JobStatus';
 import { highlightDifferences } from '../../services/diffHighlighter';
+import DOMPurify from 'dompurify';
 
 export interface ProofreadingData {
   originalText: string;
@@ -150,7 +151,7 @@ const ProofreadingInterfacePage: React.FC = () => {
         </Button>
       </Link>
 
-      {/* Se stai in editMode, textarea, altrimenti dangerouslySetInnerHTML */}
+      {/* Se in modalità di modifica, viene usato un textarea, altrimenti viene mostrato HTML sanificato */}
       <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
         {/* Original Text Panel */}
         <Box sx={{ border: '1px solid #ccc', p: 2 }}>
@@ -194,7 +195,9 @@ const ProofreadingInterfacePage: React.FC = () => {
                 overflowY: 'auto',
                 p: 1,
               }}
-              dangerouslySetInnerHTML={{ __html: data?.correctedText || '' }}
+              dangerouslySetInnerHTML={{
+                __html: DOMPurify.sanitize(data?.correctedText || '')
+              }}
             />
           )}
           <Box sx={{ display: 'flex', gap: 1, mt: 2, flexWrap: 'wrap' }}>
