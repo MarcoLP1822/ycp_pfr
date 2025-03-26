@@ -6,7 +6,7 @@ using System.Text;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Wordprocessing;
 using DocumentFormat.OpenXml;
-using DiffMatchPatch;
+using DiffMatchPatch; // Namespace per la libreria diff-match-patch
 using Microsoft.Extensions.Logging;
 
 namespace DocxMergeService.Services
@@ -189,36 +189,35 @@ namespace DocxMergeService.Services
             if (pPr != null)
                 paragraph.AppendChild(pPr);
 
-            // Eseguiamo un diff word-level:
-            // 1) Tokenizziamo in parole e punteggiatura usando un delimitatore speciale
+            // Tokenizziamo in parole e punteggiatura usando un delimitatore speciale
             char delimiter = '\u001F';
             string[] origTokens = System.Text.RegularExpressions.Regex.Split(originalParaText, @"(\W+)");
             string[] corrTokens = System.Text.RegularExpressions.Regex.Split(correctedParaText, @"(\W+)");
             string origJoined = string.Join(delimiter, origTokens);
             string corrJoined = string.Join(delimiter, corrTokens);
 
-            var dmp = new DiffMatchPatch();
+            // Utilizzo della classe diff_match_patch (definita nel namespace DiffMatchPatch)
+            var dmp = new diff_match_patch();
             var diffs = dmp.diff_main(origJoined, corrJoined, false);
             // Non eseguiamo cleanup per mantenere la granularità word-level
 
-            // Dopo il diff, per ciascun segmento, ricostruiamo il testo (spezzando sul delimitatore)
+            // Ricostruiamo il paragrafo, spezzando sul delimitatore
             int originalPos = 0;
             foreach (var diff in diffs)
             {
-                // Sostituiamo il delimitatore con uno spazio per ottenere il testo finale
                 string tokenText = diff.text.Replace(delimiter.ToString(), " ");
                 if (string.IsNullOrEmpty(tokenText))
                     continue;
 
-                if (diff.operation == DiffMatchPatch.Operation.EQUAL)
+                if (diff.operation == Operation.EQUAL)
                 {
                     BuildEqualRuns(paragraph, tokenText, ref originalPos, runMap);
                 }
-                else if (diff.operation == DiffMatchPatch.Operation.DELETE)
+                else if (diff.operation == Operation.DELETE)
                 {
                     BuildDeletedRuns(paragraph, tokenText, ref originalPos, runMap);
                 }
-                else if (diff.operation == DiffMatchPatch.Operation.INSERT)
+                else if (diff.operation == Operation.INSERT)
                 {
                     BuildInsertedRuns(paragraph, tokenText, originalPos, runMap);
                 }
