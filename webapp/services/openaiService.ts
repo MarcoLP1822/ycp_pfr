@@ -1,19 +1,4 @@
-/**
- * @file webapp/services/openaiService.ts
- * @description
- * Questo file fornisce le funzioni per il proofreading tramite OpenAI.
- * Include la funzione di suddivisione del testo in chunk basati sul numero di token,
- * la chiamata a OpenAI per correggere ogni chunk e la funzione principale che elabora
- * l'intero testo.
- *
- * @dependencies
- * - Logger per il logging
- * - @dqbd/tiktoken per la tokenizzazione
- *
- * @notes
- * La funzione chunkTextByTokens ora utilizza direttamente encoding.decode(tokenChunk)
- * per uniformare la conversione dei token in stringa.
- */
+/// <reference types="node" />
 
 import Logger from './logger';
 import { encoding_for_model } from '@dqbd/tiktoken';
@@ -38,10 +23,11 @@ function chunkTextByTokens(text: string, maxTokens: number, model: string): stri
   const tokens = encoding.encode(text);
   const chunks: string[] = [];
   for (let i = 0; i < tokens.length; i += maxTokens) {
-    // Ricaviamo una "fetta" di token
+    // Otteniamo una "fetta" di token. tokens.slice() restituisce un sottovettore.
     const tokenChunk = tokens.slice(i, i + maxTokens);
-    // Decodifichiamo i token in una stringa in modo diretto
-    const decodedArray = encoding.decode(tokenChunk);
+    // Assicuriamoci che tokenChunk sia un Uint32Array
+    const tokenChunkArray = tokenChunk instanceof Uint32Array ? tokenChunk : new Uint32Array(tokenChunk);
+    const decodedArray = encoding.decode(tokenChunkArray);
     const decodedString = new TextDecoder().decode(decodedArray);
     chunks.push(decodedString);
   }
@@ -60,12 +46,12 @@ function delay(ms: number): Promise<void> {
  */
 async function proofreadChunk(chunk: string): Promise<string> {
   const API_URL = "https://api.openai.com/v1/chat/completions";
-  const API_KEY = process.env.OPENAI_API_KEY;
+  const API_KEY = (process as any).env.OPENAI_API_KEY;
   const MAX_RETRIES = 3;
   const RETRY_DELAY_MS = 1000;
 
   const payload = {
-    model: "gpt-4o-mini", // o il modello che usi
+    model: "gpt-4o-mini",
     messages: [
       {
         role: "system",
@@ -129,20 +115,17 @@ export async function proofreadDocument(
   text: string,
   isCancelled?: () => boolean
 ): Promise<ProofreadingResult> {
-  // Scegli il modello e il numero massimo di token per chunk
   const model = "gpt-4o-mini";
   const MAX_TOKENS_PER_CHUNK = 3000;
 
   Logger.info(`Inizio proofreading del documento: lunghezza totale ${text.length} caratteri.`);
   const startTimeTotal = Date.now();
 
-  // Calcoliamo i token totali
   const encoding = encoding_for_model(model as any);
   const tokensRaw = encoding.encode(text);
   const totalTokens = tokensRaw.length;
   Logger.info(`Il documento contiene circa ${totalTokens} token.`);
 
-  // Se il testo è più corto di MAX_TOKENS_PER_CHUNK, inviamo in un solo chunk
   if (totalTokens <= MAX_TOKENS_PER_CHUNK) {
     Logger.info("Testo breve, procedo con una singola chiamata.");
     const corrected = await proofreadChunk(text);
@@ -150,7 +133,6 @@ export async function proofreadDocument(
     return { correctedText: corrected };
   }
 
-  // Altrimenti, lo dividiamo in chunk
   const chunks = chunkTextByTokens(text, MAX_TOKENS_PER_CHUNK, model);
   Logger.info(`Testo diviso in ${chunks.length} chunk basati sui token.`);
 
@@ -166,7 +148,7 @@ export async function proofreadDocument(
       const corrected = await proofreadChunk(chunks[i]);
       correctedChunks.push(corrected);
       Logger.info(`Chunk ${i + 1} elaborato con successo in ${Date.now() - chunkStart}ms.`);
-      Logger.info(`Memoria corrente: ${JSON.stringify(process.memoryUsage())}`);
+      Logger.info(`Memoria corrente: ${JSON.stringify((process as any).memoryUsage())}`);
     } catch (err) {
       Logger.error(`Errore nell'elaborazione del chunk ${i + 1}: ${err instanceof Error ? err.message : err}`);
       throw err;
