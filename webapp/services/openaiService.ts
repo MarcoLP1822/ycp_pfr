@@ -1,4 +1,19 @@
-// webapp/services/openaiService.ts
+/**
+ * @file webapp/services/openaiService.ts
+ * @description
+ * Questo file fornisce le funzioni per il proofreading tramite OpenAI.
+ * Include la funzione di suddivisione del testo in chunk basati sul numero di token,
+ * la chiamata a OpenAI per correggere ogni chunk e la funzione principale che elabora
+ * l'intero testo.
+ *
+ * @dependencies
+ * - Logger per il logging
+ * - @dqbd/tiktoken per la tokenizzazione
+ *
+ * @notes
+ * La funzione chunkTextByTokens ora utilizza direttamente encoding.decode(tokenChunk)
+ * per uniformare la conversione dei token in stringa.
+ */
 
 import Logger from './logger';
 import { encoding_for_model } from '@dqbd/tiktoken';
@@ -22,13 +37,12 @@ function chunkTextByTokens(text: string, maxTokens: number, model: string): stri
   // Otteniamo l'array di token (numeri)
   const tokens = encoding.encode(text);
   const chunks: string[] = [];
-
   for (let i = 0; i < tokens.length; i += maxTokens) {
     // Ricaviamo una "fetta" di token
     const tokenChunk = tokens.slice(i, i + maxTokens);
-    // Decodifichiamo i token in una stringa
-    const decodedString = String.fromCharCode(...encoding.decode(tokenChunk));
-    // Aggiungiamo la stringa all'array di chunk
+    // Decodifichiamo i token in una stringa in modo diretto
+    const decodedArray = encoding.decode(tokenChunk);
+    const decodedString = new TextDecoder().decode(decodedArray);
     chunks.push(decodedString);
   }
   return chunks;
@@ -55,11 +69,12 @@ async function proofreadChunk(chunk: string): Promise<string> {
     messages: [
       {
         role: "system",
-        content: "Sei un assistente AI editor ed esperto di correzione testi che corregge errori di grammatica, punteggiatura e ortografia. Restituisci solo la versione corretta in forma semplice del testo.",
+        content:
+          "Sei un assistente AI editor ed esperto di correzione testi che corregge errori di grammatica, punteggiatura e ortografia. Restituisci solo la versione corretta in forma semplice del testo.",
       },
       {
         role: "user",
-        content: chunk, // QUI passiamo testo, non numeri
+        content: chunk,
       },
     ],
     temperature: 0.2,
@@ -103,7 +118,6 @@ async function proofreadChunk(chunk: string): Promise<string> {
       await delay(RETRY_DELAY_MS);
     }
   }
-  // In teoria non dovrebbe mai arrivare qui
   throw new Error("Errore inaspettato nella funzione proofreadChunk.");
 }
 

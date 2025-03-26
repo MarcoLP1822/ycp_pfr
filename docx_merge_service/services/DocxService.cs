@@ -7,6 +7,7 @@ using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Wordprocessing;
 using DocumentFormat.OpenXml;
 using DiffMatchPatch;
+using Microsoft.Extensions.Logging;
 
 namespace DocxMergeService.Services
 {
@@ -17,6 +18,39 @@ namespace DocxMergeService.Services
     /// </summary>
     public class DocxService
     {
+        private readonly ILogger<DocxService> _logger;
+
+        public DocxService(ILogger<DocxService> logger)
+        {
+            _logger = logger;
+        }
+
+        /// <summary>
+        /// Carica un documento DOCX da uno stream.
+        /// </summary>
+        /// <param name="stream">Lo stream da cui caricare il documento.</param>
+        /// <returns>Il documento WordprocessingDocument aperto in modalità sola lettura.</returns>
+        public WordprocessingDocument LoadDocument(Stream stream)
+        {
+            if (stream == null)
+                throw new ArgumentNullException(nameof(stream));
+            return WordprocessingDocument.Open(stream, false);
+        }
+
+        /// <summary>
+        /// Estrae il Body dal documento DOCX.
+        /// </summary>
+        /// <param name="doc">Il documento DOCX aperto.</param>
+        /// <returns>Il Body del documento.</returns>
+        public Body ExtractBody(WordprocessingDocument doc)
+        {
+            if (doc == null)
+                throw new ArgumentNullException(nameof(doc));
+            if (doc.MainDocumentPart?.Document == null)
+                throw new Exception("Invalid DOCX: missing document.");
+            return doc.MainDocumentPart.Document.Body;
+        }
+
         /// <summary>
         /// Esegue la fusione parziale tra il testo originale contenuto nel DOCX e il testo corretto (da DB).
         /// Utilizza un diff word-level per ridurre il numero di nodi creati.
@@ -163,7 +197,7 @@ namespace DocxMergeService.Services
             string origJoined = string.Join(delimiter, origTokens);
             string corrJoined = string.Join(delimiter, corrTokens);
 
-            var dmp = new diff_match_patch();
+            var dmp = new DiffMatchPatch();
             var diffs = dmp.diff_main(origJoined, corrJoined, false);
             // Non eseguiamo cleanup per mantenere la granularità word-level
 
@@ -176,15 +210,15 @@ namespace DocxMergeService.Services
                 if (string.IsNullOrEmpty(tokenText))
                     continue;
 
-                if (diff.operation == Operation.EQUAL)
+                if (diff.operation == DiffMatchPatch.Operation.EQUAL)
                 {
                     BuildEqualRuns(paragraph, tokenText, ref originalPos, runMap);
                 }
-                else if (diff.operation == Operation.DELETE)
+                else if (diff.operation == DiffMatchPatch.Operation.DELETE)
                 {
                     BuildDeletedRuns(paragraph, tokenText, ref originalPos, runMap);
                 }
-                else if (diff.operation == Operation.INSERT)
+                else if (diff.operation == DiffMatchPatch.Operation.INSERT)
                 {
                     BuildInsertedRuns(paragraph, tokenText, originalPos, runMap);
                 }
@@ -196,7 +230,6 @@ namespace DocxMergeService.Services
         /// </summary>
         private void BuildEqualRuns(Paragraph paragraph, string text, ref int originalPos, List<RunPositionInfo> runMap)
         {
-            // Per word-level diff si assume che le modifiche siano blocchi più grandi
             var rpInfo = FindRunPropsForPosition(runMap, originalPos);
             var run = new Run();
             if (rpInfo?.RunProperties != null)
@@ -231,7 +264,6 @@ namespace DocxMergeService.Services
         /// </summary>
         private void BuildInsertedRuns(Paragraph paragraph, string text, int originalPos, List<RunPositionInfo> runMap)
         {
-            // Per gli inserimenti, usiamo la formattazione "vicina" (se disponibile)
             var rpInfo = FindRunPropsForPosition(runMap, originalPos);
             var run = new Run();
             if (rpInfo?.RunProperties != null)
