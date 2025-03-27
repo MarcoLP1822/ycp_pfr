@@ -10,6 +10,10 @@ webapp/node_modules/
 # Build output directories
 .next/
 out/
+docx_merge_service/bin/
+docx_merge_service/obj/
+docx_merge_service/Debug/
+docx_merge_service/Release/
 
 # production
 /build
