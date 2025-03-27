@@ -6,15 +6,15 @@ using System.Text;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Wordprocessing;
 using DocumentFormat.OpenXml;
-using DiffMatchPatch; // Namespace per la libreria diff-match-patch
+using DiffMatchPatch; // Libreria diff-match-patch per il confronto a livello di parola
 using Microsoft.Extensions.Logging;
+using Codeuctivity.OpenXmlPowerTools;
+using Codeuctivity.OpenXmlPowerTools.WmlComparer;
 
 namespace DocxMergeService.Services
 {
     /// <summary>
-    /// Servizio che esegue un merge "granulare" del testo corretto in un DOCX.
-    /// Il risultato è un file in cui solo le parole cambiate sono segnalate come revisioni (ins/del),
-    /// preservando interamente la formattazione originale.
+    /// Servizio per l'elaborazione e il merge di documenti DOCX, incluso il supporto per il merge parziale e tramite WmlComparer.
     /// </summary>
     public class DocxService
     {
@@ -52,12 +52,14 @@ namespace DocxMergeService.Services
         }
 
         /// <summary>
-        /// Esegue la fusione parziale tra il testo originale contenuto nel DOCX e il testo corretto (da DB).
-        /// Utilizza un diff word-level per ridurre il numero di nodi creati.
+        /// Esegue il merge parziale tra il testo originale contenuto nel DOCX e il testo corretto.
         /// </summary>
+        /// <param name="originalStream">Lo stream del documento originale.</param>
+        /// <param name="correctedText">Il testo corretto da integrare.</param>
+        /// <returns>Un MemoryStream contenente il documento modificato.</returns>
         public MemoryStream MergeDocumentPartial(MemoryStream originalStream, string correctedText)
         {
-            // Scriviamo il contenuto in un file temporaneo
+            // Salva il contenuto originale in un file temporaneo.
             string tempFilePath = Path.GetTempFileName();
             originalStream.Position = 0;
             using (var fs = new FileStream(tempFilePath, FileMode.Create, FileAccess.Write))
@@ -75,7 +77,7 @@ namespace DocxMergeService.Services
                     if (body == null)
                         throw new Exception("Invalid DOCX: missing body.");
 
-                    // Suddividiamo il testo corretto in paragrafi (assumendo \n come separatore)
+                    // Suddividi il testo corretto in paragrafi (usando \n come separatore)
                     var correctedParagraphs = correctedText.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
                     var originalParagraphs = body.Elements<Paragraph>().ToList();
                     int maxCount = Math.Max(originalParagraphs.Count, correctedParagraphs.Length);
@@ -96,14 +98,14 @@ namespace DocxMergeService.Services
                         }
                         else if (i >= originalParagraphs.Count)
                         {
-                            // Aggiungiamo un nuovo paragrafo con il testo corretto come inserimento
+                            // Aggiungi un nuovo paragrafo con il testo corretto come inserzione
                             var newP = new Paragraph();
                             InsertParagraphAsInsertion(newP, correctedParagraphs[i]);
                             body.AppendChild(newP);
                         }
                         else
                         {
-                            // Paragrafo in eccesso nell'originale: lo marcamo come eliminato
+                            // Paragrafo in eccesso nell'originale: marcato come eliminato
                             MarkParagraphAsDeleted(originalParagraphs[i]);
                         }
                     }
@@ -111,7 +113,6 @@ namespace DocxMergeService.Services
                     doc.MainDocumentPart.Document.Save();
                 }
 
-                // Ritorna il file finale in uno stream
                 var mergedStream = new MemoryStream();
                 using (var fs = new FileStream(tempFilePath, FileMode.Open, FileAccess.Read))
                 {
@@ -128,7 +129,63 @@ namespace DocxMergeService.Services
         }
 
         /// <summary>
-        /// Abilita Track Revisions nel documento.
+        /// Esegue il merge del documento originale con il testo corretto utilizzando WmlComparer,
+        /// in modo da mantenere stili, formattazione e tracciare le revisioni.
+        /// </summary>
+        /// <param name="originalStream">Lo stream del documento DOCX originale.</param>
+        /// <param name="correctedText">Il testo corretto da integrare.</param>
+        /// <returns>Un MemoryStream contenente il DOCX fuso con track changes.</returns>
+        public MemoryStream MergeDocumentUsingWmlComparer(MemoryStream originalStream, string correctedText)
+        {
+            originalStream.Position = 0;
+
+            // Salva lo stream originale in un file temporaneo.
+            string originalTempPath = Path.GetTempFileName();
+            using (var fs = new FileStream(originalTempPath, FileMode.Create, FileAccess.Write))
+            {
+                originalStream.CopyTo(fs);
+            }
+
+            // Crea un documento DOCX dal testo corretto: suddivide il testo in paragrafi.
+            var correctedParagraphs = correctedText
+                .Split(new[] { "\r\n", "\n" }, StringSplitOptions.None)
+                .Select(line => new Paragraph(new Run(new Text(line) { Space = SpaceProcessingModeValues.Preserve })))
+                .ToList();
+            var doc = new Document(new Body(correctedParagraphs));
+            byte[] correctedDocBytes = DocumentFormat.OpenXml.Packaging.Packer.ToByteArray(doc);
+            string correctedTempPath = Path.GetTempFileName();
+            File.WriteAllBytes(correctedTempPath, correctedDocBytes);
+
+            // Crea i WmlDocument dai file temporanei.
+            var wmlOriginal = new WmlDocument(originalTempPath);
+            var wmlCorrected = new WmlDocument(correctedTempPath);
+
+            // Configura le impostazioni per WmlComparer.
+            var comparerSettings = new WmlComparerSettings
+            {
+                AuthorForRevisions = "AI Correction",
+                DetailThreshold = 0
+            };
+
+            // Confronta i due documenti per generare il DOCX finale con track changes.
+            var mergedWml = WmlComparer.Compare(wmlOriginal, wmlCorrected, comparerSettings);
+
+            // Pulisci i file temporanei.
+            try
+            {
+                File.Delete(originalTempPath);
+                File.Delete(correctedTempPath);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning($"Impossibile eliminare i file temporanei: {ex.Message}");
+            }
+
+            return new MemoryStream(mergedWml.DocumentByteArray);
+        }
+
+        /// <summary>
+        /// Abilita il Track Revisions nel documento.
         /// </summary>
         private void EnableTrackRevisions(WordprocessingDocument doc)
         {
@@ -148,8 +205,7 @@ namespace DocxMergeService.Services
         }
 
         /// <summary>
-        /// Costruisce una mappa dei run del paragrafo, ottenendo la concatenazione del testo originale
-        /// e salvando per ciascun run il range (start-end) e le RunProperties.
+        /// Costruisce una mappa dei run in un paragrafo e restituisce il testo concatenato.
         /// </summary>
         private List<RunPositionInfo> BuildRunMapFromParagraph(Paragraph paragraph, out string originalParaText)
         {
@@ -178,30 +234,26 @@ namespace DocxMergeService.Services
         }
 
         /// <summary>
-        /// Esegue il diff word-level tra originalParaText e correctedParaText e ricostruisce il paragrafo
-        /// creando run normali, <w:del> e <w:ins> secondo le differenze.
+        /// Esegue il diff word-level tra il testo originale e quello corretto, ricostruendo il paragrafo.
         /// </summary>
         private void UpdateParagraphWithDiff(Paragraph paragraph, string originalParaText, string correctedParaText, List<RunPositionInfo> runMap)
         {
-            // Rimuoviamo i figli del paragrafo, mantenendo eventuali ParagraphProperties
+            // Conserva le proprietà del paragrafo.
             var pPr = paragraph.ParagraphProperties?.CloneNode(true) as ParagraphProperties;
             paragraph.RemoveAllChildren();
             if (pPr != null)
                 paragraph.AppendChild(pPr);
 
-            // Tokenizziamo in parole e punteggiatura usando un delimitatore speciale
+            // Tokenizza in parole e spazi usando un delimitatore speciale.
             char delimiter = '\u001F';
             string[] origTokens = System.Text.RegularExpressions.Regex.Split(originalParaText, @"(\s+)");
             string[] corrTokens = System.Text.RegularExpressions.Regex.Split(correctedParaText, @"(\s+)");
             string origJoined = string.Join(delimiter, origTokens);
             string corrJoined = string.Join(delimiter, corrTokens);
 
-            // Utilizzo della classe diff_match_patch (definita nel namespace DiffMatchPatch)
-            var dmp = new diff_match_patch();
+            var dmp = new DiffMatchPatch.diff_match_patch();
             var diffs = dmp.diff_main(origJoined, corrJoined, false);
-            // Non eseguiamo cleanup per mantenere la granularità word-level
 
-            // Ricostruiamo il paragrafo, spezzando sul delimitatore
             int originalPos = 0;
             foreach (var diff in diffs)
             {
@@ -209,15 +261,15 @@ namespace DocxMergeService.Services
                 if (string.IsNullOrEmpty(tokenText))
                     continue;
 
-                if (diff.operation == Operation.EQUAL)
+                if (diff.operation == DiffMatchPatch.Operation.EQUAL)
                 {
                     BuildEqualRuns(paragraph, tokenText, ref originalPos, runMap);
                 }
-                else if (diff.operation == Operation.DELETE)
+                else if (diff.operation == DiffMatchPatch.Operation.DELETE)
                 {
                     BuildDeletedRuns(paragraph, tokenText, ref originalPos, runMap);
                 }
-                else if (diff.operation == Operation.INSERT)
+                else if (diff.operation == DiffMatchPatch.Operation.INSERT)
                 {
                     BuildInsertedRuns(paragraph, tokenText, originalPos, runMap);
                 }
@@ -225,7 +277,7 @@ namespace DocxMergeService.Services
         }
 
         /// <summary>
-        /// Crea run normali (EQUAL) copiando la formattazione dal runMap.
+        /// Crea run normali per il testo uguale.
         /// </summary>
         private void BuildEqualRuns(Paragraph paragraph, string text, ref int originalPos, List<RunPositionInfo> runMap)
         {
@@ -239,7 +291,7 @@ namespace DocxMergeService.Services
         }
 
         /// <summary>
-        /// Crea run per la parte DELETE racchiudendoli in <w:del>.
+        /// Crea run per il testo da eliminare, racchiudendolo in <w:del>.
         /// </summary>
         private void BuildDeletedRuns(Paragraph paragraph, string text, ref int originalPos, List<RunPositionInfo> runMap)
         {
@@ -259,7 +311,7 @@ namespace DocxMergeService.Services
         }
 
         /// <summary>
-        /// Crea run per la parte INSERT racchiudendoli in <w:ins>.
+        /// Crea run per il testo da inserire, racchiudendolo in <w:ins>.
         /// </summary>
         private void BuildInsertedRuns(Paragraph paragraph, string text, int originalPos, List<RunPositionInfo> runMap)
         {
@@ -278,7 +330,7 @@ namespace DocxMergeService.Services
         }
 
         /// <summary>
-        /// Cerca nella runMap la RunProperties per la posizione indicata.
+        /// Cerca nella mappa dei run le proprietà per la posizione specificata.
         /// </summary>
         private RunPositionInfo FindRunPropsForPosition(List<RunPositionInfo> runMap, int position)
         {
@@ -291,7 +343,7 @@ namespace DocxMergeService.Services
         }
 
         /// <summary>
-        /// Inserisce un intero paragrafo come inserito (<w:ins>).
+        /// Inserisce un intero paragrafo come inserzione.
         /// </summary>
         private void InsertParagraphAsInsertion(Paragraph para, string paragraphText)
         {
@@ -315,10 +367,8 @@ namespace DocxMergeService.Services
             {
                 string text = string.Concat(run.Elements<Text>().Select(t => t.Text));
                 run.RemoveAllChildren<Text>();
-
                 var delText = new DeletedText(text) { Space = SpaceProcessingModeValues.Preserve };
                 run.AppendChild(delText);
-
                 var delRun = new DeletedRun
                 {
                     Author = "AI Correction",
@@ -332,7 +382,7 @@ namespace DocxMergeService.Services
     }
 
     /// <summary>
-    /// Struttura di supporto per mappare un run: indica l'intervallo di caratteri e le relative RunProperties.
+    /// Classe di supporto per mappare le proprietà dei run in un paragrafo.
     /// </summary>
     public class RunPositionInfo
     {

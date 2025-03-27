@@ -1,9 +1,6 @@
 using System;
 using System.IO;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
-using DocumentFormat.OpenXml.Packaging;
 using DocxMergeService.Services;
 
 namespace DocxMergeService.Controllers
@@ -12,64 +9,37 @@ namespace DocxMergeService.Controllers
     [Route("merge")]
     public class MergeController : ControllerBase
     {
-        private readonly ILogger<MergeController> _logger;
         private readonly DocxService _docxService;
 
-        public MergeController(ILogger<MergeController> logger, DocxService docxService)
+        public MergeController(DocxService docxService)
         {
-            _logger = logger;
             _docxService = docxService;
         }
 
-        /// <summary>
-        /// Riceve un file DOCX e il testo corretto (tutto in un’unica stringa, suddiviso in paragrafi con \n)
-        /// e restituisce un DOCX con le sole modifiche (a livello di parola) evidenziate in Track Changes.
-        /// </summary>
-        [HttpPost]
-        public async Task<IActionResult> Merge([FromForm] IFormFile file, [FromForm] string correctedText)
+        [HttpPost("merge-docx")]
+        public IActionResult Merge([FromForm] IFormFile file, [FromForm] string correctedText)
         {
             if (file == null || string.IsNullOrWhiteSpace(correctedText))
             {
-                _logger.LogError("Missing file or correctedText.");
-                return BadRequest(new { error = "Both file and correctedText are required." });
-            }
-
-            // Verifica che il file sia un DOCX
-            if (!file.ContentType.Equals("application/vnd.openxmlformats-officedocument.wordprocessingml.document", StringComparison.OrdinalIgnoreCase))
-            {
-                _logger.LogError($"Invalid file type: {file.ContentType}");
-                return BadRequest(new { error = "Only DOCX files are supported." });
+                return BadRequest(new { error = "Entrambi i campi (file e correctedText) sono obbligatori." });
             }
 
             try
             {
-                using var memoryStream = new MemoryStream();
-                await file.CopyToAsync(memoryStream);
-                memoryStream.Position = 0;
-
-                // Verifica struttura del DOCX
-                try
+                using (var memoryStream = new MemoryStream())
                 {
-                    using (WordprocessingDocument.Open(memoryStream, false)) { }
-                    memoryStream.Position = 0;
+                    file.CopyTo(memoryStream);
+                    // Utilizza il nuovo metodo che usa WmlComparer per il merge
+                    MemoryStream mergedStream = _docxService.MergeDocumentUsingWmlComparer(memoryStream, correctedText);
+                    byte[] mergedBytes = mergedStream.ToArray();
+                    return File(mergedBytes,
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        "proofread-merged.docx");
                 }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Invalid DOCX structure.");
-                    return BadRequest(new { error = "Invalid DOCX file structure." });
-                }
-
-                // Esegui il merge parziale in revisione
-                var mergedDocStream = _docxService.MergeDocumentPartial(memoryStream, correctedText);
-
-                return File(mergedDocStream.ToArray(),
-                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    "proofread-merged.docx");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error merging partial revisions.");
-                return StatusCode(500, new { error = "Internal server error during partial merge." });
+                return StatusCode(500, new { error = "Errore durante il merge: " + ex.Message });
             }
         }
     }
