@@ -191,8 +191,8 @@ namespace DocxMergeService.Services
 
             // Tokenizziamo in parole e punteggiatura usando un delimitatore speciale
             char delimiter = '\u001F';
-            string[] origTokens = System.Text.RegularExpressions.Regex.Split(originalParaText, @"(\W+)");
-            string[] corrTokens = System.Text.RegularExpressions.Regex.Split(correctedParaText, @"(\W+)");
+            string[] origTokens = System.Text.RegularExpressions.Regex.Split(originalParaText, @"(\s+)");
+            string[] corrTokens = System.Text.RegularExpressions.Regex.Split(correctedParaText, @"(\s+)");
             string origJoined = string.Join(delimiter, origTokens);
             string corrJoined = string.Join(delimiter, corrTokens);
 
